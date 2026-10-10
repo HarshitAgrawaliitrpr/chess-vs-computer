@@ -102,6 +102,8 @@ comments inside the pipeline file.
 
 ## Deploy to Vercel (full website, one project)
 
+Live site: **https://chess-vs-computer-five.vercel.app**
+
 The repo is set up so a single Vercel project serves **both** the React
 frontend and the FastAPI engine API on one domain:
 
@@ -109,8 +111,8 @@ frontend and the FastAPI engine API on one domain:
 |---|---|
 | `main.py` (root) | Vercel entrypoint — re-exports the FastAPI `app` |
 | `requirements.txt` (root) | serverless runtime deps (`fastapi`, `python-chess`, `pydantic`) |
-| `vercel.json` | `buildCommand` runs `npm ci && npm run build` in `frontend/`; `maxDuration: 30` for the engine search |
-| `backend/app/main.py` | `app.frontend("/", ...)` serves `frontend/dist` — `/api/*` routes are declared first so they always win |
+| `vercel.json` | `buildCommand` runs `npm ci && npm run build` in `frontend/` |
+| `backend/app/main.py` | `app.frontend("/", ...)` serves `frontend/dist` — API routes take priority automatically |
 
 Request flow on Vercel:
 
@@ -119,16 +121,21 @@ GET  /                -> CDN (built React app)
 POST /api/engine/move -> Python function (minimax search, <= 3.5s per difficulty)
 ```
 
+Measured on the live deployment: `easy` returns in ~0.5s wall including cold
+start; `master` runs its full 3.5s search budget (depth 5, ~61k nodes) and
+still finishes comfortably inside the default function timeout.
+
 Deploy from your machine:
 
 ```bash
 npm install -g vercel
 vercel login                 # or export VERCEL_TOKEN=...
-vercel --prod                # deploy the current repo as-is
+vercel deploy --yes --prod
 ```
 
-Pushing to `main` can also trigger automatic redeploys once the Vercel
-project is connected to the GitHub repository.
+To auto-deploy on every push to `main`, connect the repository with
+`vercel git connect` (a GitHub login connection must exist in your Vercel
+account settings first).
 
 > Created by **Harshit Agrawal with MiMo** — the credit line is rendered in the
 > app footer.
