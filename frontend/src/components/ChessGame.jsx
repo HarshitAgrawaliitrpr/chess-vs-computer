@@ -25,13 +25,20 @@ export default function ChessGame() {
           position={game.fen}
           onPieceDrop={game.onPieceDrop}
           boardOrientation={game.boardOrientation}
-          arePiecesDraggable={game.canMove}
+          arePiecesDraggable={game.interactive}
+          customSquareStyles={game.squareStyles}
           animationDuration={140}
           customDarkSquareStyle={{ backgroundColor: "#779556" }}
           customLightSquareStyle={{ backgroundColor: "#ebecd0" }}
           customBoardStyle={{ borderRadius: "6px", boxShadow: "0 8px 28px rgba(0,0,0,.45)" }}
         />
-        <StatusBar status={game.status} thinking={game.thinking} error={game.error} />
+        <StatusBar
+          status={game.status}
+          thinking={game.thinking}
+          error={game.error}
+          preMove={game.preMove}
+          onCancelPreMove={game.clearPreMove}
+        />
 
         <div className="game__actions">
           <button type="button" onClick={() => game.startGame("w")} disabled={game.thinking}>

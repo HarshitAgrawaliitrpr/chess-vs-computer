@@ -88,6 +88,10 @@ export function useChessGame({
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState(null);
   const [engineInfo, setEngineInfo] = useState(null);
+  // Single-slot pre-move: queued while the opponent is to move, applied the
+  // moment the human's turn arrives (and discarded if it became illegal).
+  const [preMove, setPreMove] = useState(null);
+  const preMoveRef = useRef(null);
 
   // Refs keep async callbacks free of stale closures.
   const busyRef = useRef(false);
@@ -98,65 +102,115 @@ export function useChessGame({
 
   const commit = useCallback(() => setGameState(snapshot(gameRef.current)), []);
 
+  /** Drop the queued pre-move (cancel button, restart, or game over). */
+  const clearPreMove = useCallback(() => {
+    preMoveRef.current = null;
+    setPreMove(null);
+  }, []);
+
   /** Ask the engine to play the side to move in the current position. */
   const requestComputerMove = useCallback(async () => {
-    const game = gameRef.current;
-    if (busyRef.current || game.isGameOver()) return;
+    if (busyRef.current) return;
     busyRef.current = true;
     setThinking(true);
     setError(null);
     try {
-      const result = await engineRef.current({
-        fen: game.fen(),
-        difficulty: difficultyRef.current,
-      });
-      game.move({
-        from: result.move.from,
-        to: result.move.to,
-        promotion: result.move.promotion ?? "q",
-      });
-      setEngineInfo({
-        san: result.move.san,
-        score: result.score,
-        scoreType: result.score_type,
-        mateIn: result.mate_in,
-        depth: result.depth,
-        nodes: result.nodes,
-        timeMs: result.time_ms,
-        pv: result.pv,
-        elo: result.elo_estimate,
-      });
-      commit();
+      // A queued pre-move can force a second engine move in the same turn:
+      // reply to the human move, apply the pre-move, reply to that as well.
+      for (;;) {
+        const game = gameRef.current;
+        if (game.isGameOver()) break;
+
+        const result = await engineRef.current({
+          fen: game.fen(),
+          difficulty: difficultyRef.current,
+        });
+        game.move({
+          from: result.move.from,
+          to: result.move.to,
+          promotion: result.move.promotion ?? "q",
+        });
+        setEngineInfo({
+          san: result.move.san,
+          score: result.score,
+          scoreType: result.score_type,
+          mateIn: result.mate_in,
+          depth: result.depth,
+          nodes: result.nodes,
+          timeMs: result.time_ms,
+          pv: result.pv,
+          elo: result.elo_estimate,
+        });
+        commit();
+
+        if (game.isGameOver()) {
+          clearPreMove(); // no pre-move may outlive the finished game
+          break;
+        }
+
+        if (game.turn() === colorRef.current) {
+          // Human's turn: play the queued pre-move if it is still legal.
+          const queued = preMoveRef.current;
+          if (queued) {
+            preMoveRef.current = null;
+            setPreMove(null);
+            try {
+              game.move({ from: queued.from, to: queued.to, promotion: "q" });
+              commit();
+            } catch {
+              // The opponent's reply invalidated it — discarded silently.
+            }
+          }
+          if (game.isGameOver() || game.turn() === colorRef.current) break;
+        }
+        // Otherwise the pre-move was played and the engine must answer it.
+      }
     } catch (err) {
       setError(err?.message ?? String(err));
     } finally {
       busyRef.current = false;
       setThinking(false);
     }
-  }, [commit]);
+  }, [commit, clearPreMove]);
 
-  /** react-chessboard drop handler: returns `false` when the move is illegal. */
+  /**
+   * react-chessboard drop handler. On our own turn the move is applied for
+   * real; while the opponent is to move a single pre-move is queued instead
+   * (the board position itself never changes until the turn arrives).
+   */
   const onPieceDrop = useCallback(
     (source, target) => {
       const game = gameRef.current;
-      if (busyRef.current || gameState.status.over || game.turn() !== colorRef.current) return false;
+      if (gameState.status.over) return false;
 
-      let move = null;
-      try {
-        move = game.move({ from: source, to: target });
-      } catch {
+      if (game.turn() === colorRef.current) {
+        // ---- normal move (only while the engine is not already moving) ----
+        if (busyRef.current) return false;
+        let move = null;
         try {
-          // Only reachable for pawn promotions.
-          move = game.move({ from: source, to: target, promotion: "q" });
+          move = game.move({ from: source, to: target });
         } catch {
-          return false; // illegal move - keep the piece where it was
+          try {
+            // Only reachable for pawn promotions.
+            move = game.move({ from: source, to: target, promotion: "q" });
+          } catch {
+            return false; // illegal move - keep the piece where it was
+          }
         }
-      }
-      if (!move) return false;
+        if (!move) return false;
 
-      commit();
-      if (!game.isGameOver()) void requestComputerMove();
-      return true;
+        commit();
+        if (!game.isGameOver()) void requestComputerMove();
+        return true;
+      }
+
+      // ---- pre-move: not our turn, queue it for the upcoming turn ----
+      const piece = game.get(source);
+      if (!piece || piece.color !== colorRef.current) return false; // only our own pieces
+      const queued = { from: source, to: target };
+      preMoveRef.current = queued;
+      setPreMove(queued);
+      return false; // the real position stays untouched
     },
     [commit, gameState.status.over, requestComputerMove],
   );
@@ -164,6 +218,7 @@ export function useChessGame({
   /** (Re)start a game; when the human plays Black the engine opens as White. */
   const startGame = useCallback(
     (color = colorRef.current) => {
+      clearPreMove();
       colorRef.current = color;
       setPlayerColorState(color);
       gameRef.current = new Chess();
@@ -172,7 +227,7 @@ export function useChessGame({
       commit();
       if (color === "b") void requestComputerMove();
     },
-    [commit, requestComputerMove],
+    [clearPreMove, commit, requestComputerMove],
   );
 
   const setPlayerColor = useCallback((color) => startGame(color), [startGame]);
@@ -185,15 +240,26 @@ export function useChessGame({
   /** Load an arbitrary FEN (used by tests / advanced setups). */
   const loadFen = useCallback(
     (fen) => {
+      clearPreMove();
       gameRef.current = new Chess(fen);
       setEngineInfo(null);
       setError(null);
       commit();
     },
-    [commit],
+    [clearPreMove, commit],
   );
 
   const boardOrientation = useMemo(() => (playerColor === "b" ? "black" : "white"), [playerColor]);
+
+  // Red source/target highlights for the queued pre-move (chess.com style).
+  const squareStyles = useMemo(() => {
+    if (!preMove) return {};
+    const tint = { backgroundColor: "rgba(224, 90, 90, 0.45)" };
+    return {
+      [preMove.from]: tint,
+      [preMove.to]: { ...tint, boxShadow: "inset 0 0 0 3px rgba(224, 90, 90, 0.95)" },
+    };
+  }, [preMove]);
 
   return {
     ...gameState,
@@ -204,6 +270,10 @@ export function useChessGame({
     error,
     engineInfo,
     result: describeResult(gameState.status, playerColor),
+    preMove,
+    clearPreMove,
+    squareStyles,
+    interactive: !gameState.status.over,
     canMove: !gameState.status.over && !thinking && gameState.status.turn === (playerColor === "b" ? "black" : "white"),
     onPieceDrop,
     startGame,

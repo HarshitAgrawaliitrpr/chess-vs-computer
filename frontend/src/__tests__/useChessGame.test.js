@@ -220,4 +220,92 @@ describe("useChessGame", () => {
     expect(result.current.status.kind).toBe("stalemate");
     expect(result.current.result).toBe("draw");
   });
+
+  // ---- pre-moves ----
+
+  it("queues a pre-move while the engine replies and plays it automatically", async () => {
+    const engine = fakeEngine([
+      { from: "e7", to: "e5", san: "e5", uci: "e7e5", promotion: null },
+      { from: "d7", to: "d5", san: "d5", uci: "d7d5", promotion: null },
+    ]);
+    const { result } = renderHook(() => useChessGame({ engine }));
+
+    act(() => {
+      expect(result.current.onPieceDrop("e2", "e4")).toBe(true); // real move
+      // Immediately queue a pre-move while the computer is thinking:
+      expect(result.current.onPieceDrop("d2", "d4")).toBe(false); // not applied yet
+    });
+
+    expect(result.current.preMove).toEqual({ from: "d2", to: "d4" });
+    expect(result.current.moves).toEqual(["e4"]); // position untouched
+
+    // The fake engine resolves instantly, so assert the fully settled state:
+    // e4 - e5, pre-move d4 fires, engine answers d5.
+    await wait(() => expect(result.current.moves).toEqual(["e4", "e5", "d4", "d5"]));
+    expect(result.current.preMove).toBeNull();
+    expect(result.current.squareStyles).toEqual({}); // highlights cleared
+  });
+
+  it("discards a pre-move that became illegal after the reply", async () => {
+    const engine = fakeEngine();
+    const { result } = renderHook(() => useChessGame({ engine }));
+
+    act(() => {
+      expect(result.current.onPieceDrop("e2", "e4")).toBe(true);
+      // Illegal 3-square pawn push, queued blindly (a2 still has its pawn):
+      expect(result.current.onPieceDrop("a2", "a5")).toBe(false);
+    });
+    expect(result.current.preMove).toEqual({ from: "a2", to: "a5" });
+
+    await wait(() => expect(result.current.moves).toEqual(["e4", "e5"]));
+    expect(result.current.preMove).toBeNull(); // rejected on execution
+    expect(result.current.moves).toEqual(["e4", "e5"]); // no phantom move
+    expect(engine).toHaveBeenCalledTimes(1); // engine only played its single reply
+  });
+
+  it("only accepts own pieces for a pre-move and can cancel it", async () => {
+    const engine = fakeEngine();
+    const { result } = renderHook(() => useChessGame({ engine }));
+
+    act(() => {
+      expect(result.current.onPieceDrop("e2", "e4")).toBe(true);
+      // Dragging an opponent piece must never be queued:
+      expect(result.current.onPieceDrop("e7", "e5")).toBe(false);
+    });
+    expect(result.current.preMove).toBeNull();
+
+    // A second pre-move replaces the first (each act flushes the state):
+    act(() => result.current.onPieceDrop("g1", "f3"));
+    expect(result.current.preMove).toEqual({ from: "g1", to: "f3" });
+    act(() => result.current.onPieceDrop("c2", "c4"));
+    expect(result.current.preMove).toEqual({ from: "c2", to: "c4" });
+    expect(result.current.squareStyles.c2).toBeTruthy();
+    expect(result.current.squareStyles.c4).toBeTruthy();
+
+    act(() => result.current.clearPreMove());
+    expect(result.current.preMove).toBeNull();
+    expect(result.current.squareStyles).toEqual({});
+
+    await wait(() => expect(result.current.moves).toEqual(["e4", "e5"]));
+    expect(result.current.moves).toEqual(["e4", "e5"]); // cancelled pre-move never fires
+  });
+
+  it("lets a Black player pre-move while the computer opens", async () => {
+    const engine = fakeEngine([
+      { from: "e2", to: "e4", san: "e4", uci: "e2e4", promotion: null },
+      { from: "c2", to: "c4", san: "c4", uci: "c2c4", promotion: null },
+    ]);
+    const { result } = renderHook(() => useChessGame({ engine, playerColor: "b" }));
+
+    act(() => {
+      result.current.startGame("b"); // computer opens as White
+      expect(result.current.onPieceDrop("d7", "d5")).toBe(false); // queued immediately
+    });
+    expect(result.current.preMove).toEqual({ from: "d7", to: "d5" });
+
+    // Opening e4, pre-move d5 fires, computer answers c4 — settled state:
+    await wait(() => expect(result.current.moves).toEqual(["e4", "d5", "c4"]));
+    expect(result.current.preMove).toBeNull();
+    expect(result.current.canMove).toBe(true); // back to the human
+  });
 });

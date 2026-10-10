@@ -141,6 +141,34 @@ body {
 .statusbar__badge--draw { background: #4a432c; color: #ffd98d; }
 .statusbar__badge--active { background: #2c4a30; color: var(--accent); }
 .statusbar__text { font-size: 0.95rem; }
+
+.statusbar__premove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 999px;
+  background: #4a2c2c;
+  color: #ff9d9d;
+  border: 1px solid #6b3a3a;
+}
+
+.statusbar__premove button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.statusbar__premove button:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+
 .statusbar__error { color: var(--danger); font-size: 0.85rem; margin-left: auto; }
 
 /* Difficulty ---------------------------------------------------------- */
