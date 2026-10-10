@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+coverage/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Env / IDE
+.env
+.idea/
+.vscode/
+*.swp
+
+# Harness / local artifacts
+.playwright-mcp/

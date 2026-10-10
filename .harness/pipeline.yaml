@@ -1,0 +1,188 @@
+# =============================================================================
+# Harness Open Source (Gitness) CI/CD pipeline
+# -----------------------------------------------------------------------------
+# Workflow: Build -> Test -> Dockerize -> Deploy
+#
+# Trigger: Harness creates a default push trigger for the repository
+# (Pipeline Settings > Triggers). Build/Test/Dockerize run on every push and
+# pull request; the registry push and the deployment stage gate themselves on
+# pushes to `main` with `when:` conditions.
+#
+# Note: stages do NOT share a filesystem in Harness Open Source, so each stage
+# installs exactly what it needs from a fresh checkout.
+# =============================================================================
+
+kind: pipeline
+spec:
+  stages:
+    # ------------------------------------------------------------------ BUILD
+    - name: build
+      type: ci
+      spec:
+        steps:
+          - name: backend install
+            type: run
+            spec:
+              container: python:3.12-slim
+              script: |-
+                set -e
+                cd backend
+                pip install --no-cache-dir -r requirements-dev.txt
+                python -m compileall -q app
+
+          - name: frontend install and build
+            type: run
+            spec:
+              container: node:20
+              script: |-
+                set -e
+                cd frontend
+                npm ci --no-audit --no-fund
+                npm run lint
+                npm run build
+
+    # ------------------------------------------------------------------- TEST
+    # Includes the FEN-driven tactical tests: the engine must find forced
+    # mates (mate-in-one / mate-in-two) within its time budget.
+    - name: test
+      type: ci
+      spec:
+        steps:
+          - name: backend unit and tactical tests
+            type: run
+            spec:
+              container: python:3.12-slim
+              script: |-
+                set -e
+                cd backend
+                pip install --no-cache-dir -r requirements-dev.txt
+                pytest -v
+
+          - name: frontend unit tests
+            type: run
+            spec:
+              container: node:20
+              script: |-
+                set -e
+                cd frontend
+                npm ci --no-audit --no-fund
+                npm test
+
+    # --------------------------------------------------------------- DOCKERIZE
+    # Docker-in-Docker: build both production images, then push them to the
+    # configured registry on pushes to main.
+    - name: dockerize
+      type: ci
+      spec:
+        volumes:
+          - name: dockersock
+            spec: {}
+            type: temp
+        steps:
+          - name: docker in docker
+            type: background
+            spec:
+              container:
+                image: docker:dind
+                privileged: true
+              mount:
+                - name: dockersock
+                  path: /var/run
+
+          - name: build images
+            type: run
+            spec:
+              container: docker:dind
+              mount:
+                - name: dockersock
+                  path: /var/run
+              script: |-
+                set -e
+                # wait for the docker daemon
+                for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 1; done
+                docker build -t chess-backend:${{ build.commit }} ./backend
+                docker build -t chess-frontend:${{ build.commit }} ./frontend
+                docker tag chess-backend:${{ build.commit }} chess-backend:latest
+                docker tag chess-frontend:${{ build.commit }} chess-frontend:latest
+                docker images
+
+          - name: push images to registry (main only)
+            type: run
+            when: |
+              build.event == "push"
+              and
+              build.branch == "main"
+            spec:
+              container: docker:dind
+              mount:
+                - name: dockersock
+                  path: /var/run
+              script: |-
+                set -e
+                # Real registry push. Create a `docker_registry` secret
+                # (Pipeline Settings > Secrets), set REGISTRY below to
+                # `${{ secrets.get("docker_registry") }}` and this step will
+                # push e.g. ghcr.io/acme/chess-backend:<sha>. Without a
+                # registry configured the step validates tagging and exits 0.
+                REGISTRY=""
+                if [ -z "$REGISTRY" ]; then
+                  echo "No docker_registry secret configured - tagging as release only (simulated push)."
+                  docker tag chess-backend:${{ build.commit }} chess-backend:release
+                  docker tag chess-frontend:${{ build.commit }} chess-frontend:release
+                  exit 0
+                fi
+                for img in chess-backend chess-frontend; do
+                  docker tag $img:${{ build.commit }} $REGISTRY/$img:${{ build.commit }}
+                  docker tag $img:${{ build.commit }} $REGISTRY/$img:latest
+                  docker push $REGISTRY/$img:${{ build.commit }}
+                  docker push $REGISTRY/$img:latest
+                done
+
+    # ----------------------------------------------------------------- DEPLOY
+    # Simulated cloud deployment (Render / AWS ECS / Kubernetes / ...).
+    # Swap the simulation body for your real deployment command.
+    - name: deploy
+      type: ci
+      spec:
+        steps:
+          - name: deploy to cloud (simulated)
+            type: run
+            when: |
+              build.event == "push"
+              and
+              build.branch == "main"
+            spec:
+              container: alpine:3.20
+              envs:
+                IMAGE_TAG: ${{ build.commit }}
+                DEPLOY_WEBHOOK: ""
+              script: |-
+                set -e
+                echo "--------------------------------------------------------"
+                echo " Deploying chess-vs-computer"
+                echo "   backend image  : chess-backend:${IMAGE_TAG}"
+                echo "   frontend image : chess-frontend:${IMAGE_TAG}"
+                echo "--------------------------------------------------------"
+                # Simulation hook. Point DEPLOY_WEBHOOK at your real target
+                # (create a `deploy_webhook` secret and use
+                # `${{ secrets.get("deploy_webhook") }}` above), for example:
+                #   * Render deploy hook / AWS ECS update webhook
+                #   * helm upgrade --install chess ./chart --set tag=$IMAGE_TAG
+                #   * kubectl set image deploy/chess chess-frontend=...:$IMAGE_TAG
+                if [ -n "$DEPLOY_WEBHOOK" ]; then
+                  wget -q -O - --post-data="tag=$IMAGE_TAG" "$DEPLOY_WEBHOOK"
+                  echo "Deployment webhook delivered."
+                else
+                  echo "DEPLOY_WEBHOOK not configured - deployment simulated."
+                fi
+                echo "Deployment simulation complete."
+
+          # Optional: notify on success/failure. Create a `slack_webhook`
+          # secret and uncomment to enable.
+          # - name: notify
+          #   type: plugin
+          #   when: always()
+          #   spec:
+          #     name: slack
+          #     inputs:
+          #       webhook: ${{ secrets.get("slack_webhook") }}

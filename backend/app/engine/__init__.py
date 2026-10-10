@@ -1,0 +1,1 @@
+"""Chess vs. Computer backend package."""

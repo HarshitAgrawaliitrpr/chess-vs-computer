@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: chess-backend:local
+    container_name: chess-backend
+    ports:
+      - "8000:8000"
+    environment:
+      ALLOWED_ORIGINS: "*"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: chess-frontend:local
+    container_name: chess-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    environment:
+      # Used by the nginx template to reach the engine API.
+      BACKEND_URL: http://backend:8000
+    restart: unless-stopped
