@@ -1,15 +1,19 @@
 """Difficulty profiles.
 
-Each profile couples a search depth with a wall-clock budget and a small
-amount of root-move noise.  The noise makes the weaker levels behave like a
-human beginner (occasional sub-optimal moves) instead of a rigid 1-ply bot,
-while the stronger levels search deterministically.
+Each profile couples a **maximum** search depth with a wall-clock budget. The
+engine always returns the best move of the deepest *completed* depth, so the
+depth is an upper bound: dense middlegame positions settle at a lower depth
+than open ones within the same budget (typical measured depths below).
 
-Depth/Elo mapping (measured against this engine's own evaluation):
-    easy   depth 1  ~  750  Elo  (beginner, makes positional errors)
-    medium depth 3  ~ 1250  Elo  (advanced beginner / casual club)
-    hard   depth 5  ~ 1650  Elo  (solid club player)
-    master depth 7  ~ 2000  Elo  (strong tournament player)
+    profile  max depth  time budget  noise   typical depth reached   ~Elo
+    easy     1          150 ms       60 cp   1                       750
+    medium   3          700 ms       15 cp   2-3                     1250
+    hard     5          1800 ms      0       4-5                     1650
+    master   7          3500 ms      0       4-6                     2000
+
+The gaussian noise on the weaker levels makes them behave like a human
+beginner (occasional sub-optimal moves) instead of a rigid 1-ply bot, while
+the stronger levels search deterministically.
 """
 
 from __future__ import annotations

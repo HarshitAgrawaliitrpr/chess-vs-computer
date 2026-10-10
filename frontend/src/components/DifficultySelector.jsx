@@ -1,8 +1,8 @@
 export const DIFFICULTIES = {
-  easy: { label: "Easy", hint: "Depth 1 \u00b7 ~750 Elo" },
-  medium: { label: "Medium", hint: "Depth 3 \u00b7 ~1250 Elo" },
-  hard: { label: "Hard", hint: "Depth 5 \u00b7 ~1650 Elo" },
-  master: { label: "Master", hint: "Depth 7 \u00b7 ~2000 Elo" },
+  easy: { label: "Easy", hint: "\u2264Depth 1 \u00b7 ~750 Elo" },
+  medium: { label: "Medium", hint: "\u2264Depth 3 \u00b7 ~1250 Elo" },
+  hard: { label: "Hard", hint: "\u2264Depth 5 \u00b7 ~1650 Elo" },
+  master: { label: "Master", hint: "\u2264Depth 7 \u00b7 ~2000 Elo" },
 };
 
 export default function DifficultySelector({ value, onChange, disabled }) {

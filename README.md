@@ -12,15 +12,17 @@ engine, wrapped in a Harness Open Source (Gitness) CI/CD pipeline.
 
 ## Difficulty ladder
 
-| Profile  | Depth | Time budget | Noise  | Approx. Elo |
-|----------|-------|-------------|--------|-------------|
-| `easy`   | 1     | 150 ms      | 60 cp  | ~750 (beginner) |
-| `medium` | 3     | 700 ms      | 15 cp  | ~1250 (casual club) |
-| `hard`   | 5     | 1800 ms     | 0      | ~1650 (solid club) |
-| `master` | 7     | 3500 ms     | 0      | ~2000 (expert) |
+| Profile  | Max depth | Time budget | Noise  | Typical depth reached | Approx. Elo |
+|----------|-----------|-------------|--------|----------------------|-------------|
+| `easy`   | 1         | 150 ms      | 60 cp  | 1                    | ~750 (beginner) |
+| `medium` | 3         | 700 ms      | 15 cp  | 2-3                  | ~1250 (casual club) |
+| `hard`   | 5         | 1800 ms     | 0      | 4-5                  | ~1650 (solid club) |
+| `master` | 7         | 3500 ms     | 0      | 4-6                  | ~2000 (expert) |
 
-The search always returns the best move of the deepest **completed** depth, so
-a time cut-off never returns a half-analysed move.
+Depth is an **upper bound**: the search stops when the wall-clock budget runs
+out and always returns the best move of the deepest *completed* depth, so a
+time cut-off never returns a half-analysed move. Dense middlegame positions
+settle at a lower depth than open ones, exactly like a real time-controlled game.
 
 ## Run locally
 

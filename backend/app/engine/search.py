@@ -1,4 +1,4 @@
-"""Minimax (negamax) search with alpha-beta pruning.
+﻿"""Minimax (negamax) search with alpha-beta pruning.
 
 Optimisations implemented so the engine stays inside strict time limits:
 
@@ -31,7 +31,7 @@ INF = 10**9
 MATE_SCORE = 30_000
 MATE_THRESHOLD = 29_000
 MAX_PLY = 64
-MAX_QUIESCENCE_PLY = 32
+MAX_QUIESCENCE_PLY = 12
 
 # transposition flags
 EXACT, LOWER, UPPER = 0, 1, 2
@@ -87,6 +87,10 @@ class Searcher:
             [None, None] for _ in range(MAX_PLY + 8)
         ]
         self.history: dict[tuple[int, int], int] = {}
+        # Root move scores from the previous iterative-deepening pass; used to
+        # order the root moves so alpha-beta cutoffs happen as early as
+        # possible on the next (deeper) pass.
+        self._prev_root_scores: dict[chess.Move, int] = {}
         self._start = 0.0
         self._deadline = 0.0
 
@@ -140,7 +144,15 @@ class Searcher:
     # root: full window, collects every root move score (for noise + PV)
     # ------------------------------------------------------------------ #
     def _search_root(self, board: chess.Board, depth: int) -> list[tuple[chess.Move, int]]:
-        moves = self._order_moves(board, list(board.legal_moves), None, ply=0)
+        # Prefer the best move of the previous (shallower) iteration first:
+        # the root ordering dominates overall alpha-beta efficiency.
+        key = self._tt_key(board)
+        entry = self.tt.get(key)
+        tt_move = entry[0] if entry is not None else None
+        moves = self._order_moves(board, list(board.legal_moves), tt_move, ply=0)
+        if len(self._prev_root_scores) > 1:
+            moves.sort(key=lambda m: self._prev_root_scores.get(m, -INF), reverse=True)
+
         alpha, beta = -INF, INF
         scores: list[tuple[chess.Move, int]] = []
         best = -INF
@@ -148,7 +160,7 @@ class Searcher:
         for move in moves:
             board.push(move)
             try:
-                score = -self._negamax(board, depth - 1, -beta, -alpha, 1)
+                score = -self._negamax(board, depth - 1, -beta, -alpha, 1, is_null=False)
             finally:
                 board.pop()
             scores.append((move, score))
@@ -156,6 +168,12 @@ class Searcher:
                 best = score
             if score > alpha:
                 alpha = score
+
+        self._prev_root_scores = dict(scores)
+        # Cache the root result so the next iteration starts with the right
+        # move first and the PV extraction has an entry to follow.
+        best_move, best_score = max(scores, key=lambda item: item[1])
+        self.tt[key] = (best_move, depth, best_score, EXACT)
         return scores
 
     def _select_move(self, scores: list[tuple[chess.Move, int]]) -> chess.Move:
@@ -180,6 +198,7 @@ class Searcher:
         alpha: int,
         beta: int,
         ply: int,
+        is_null: bool = False,
     ) -> int:
         self._check_time()
         self.nodes += 1
@@ -207,27 +226,54 @@ class Searcher:
                 if alpha >= beta:
                     return tt_score
 
+        if depth <= 0:
+            # Resolve captures at the horizon. Generating the full legal move
+            # list here would be wasted work - quiescence only needs captures.
+            return self._quiescence(board, alpha, beta, ply)
+
         moves = list(board.legal_moves)
         if not moves:
             # No legal moves: checkmate if in check, otherwise stalemate.
             return -MATE_SCORE + ply if board.is_check() else 0
 
-        if depth <= 0:
-            return self._quiescence(board, alpha, beta, ply)
-
         in_check = board.is_check()
+
+        # --- Null-move pruning -------------------------------------------
+        # "Pass" the turn: if the side to move is still ahead by a full move
+        # after giving the opponent an extra tempo, the position is so good
+        # that nothing else needs to be searched (fail-hard beta cut-off).
+        # Skipped when in check, in a pawn-only endgame (zugzwang) or on a
+        # null-move already in the chain.
+        if (
+            not is_null
+            and not in_check
+            and depth >= 2
+            and beta < MATE_THRESHOLD
+            and self._has_non_pawn_material(board, board.turn)
+        ):
+            reduction = 2 + (1 if depth >= 6 else 0)
+            board.push(chess.Move.null())
+            try:
+                score = -self._negamax(
+                    board, depth - 1 - reduction, -beta, -beta + 1, ply + 1, is_null=True
+                )
+            finally:
+                board.pop()
+            if score >= beta:
+                return beta
+
         ordered = self._order_moves(board, moves, tt_move, ply)
 
         best_score = -INF
         best_move: Optional[chess.Move] = None
         flag = UPPER
         # Give checking moves one extra ply of search (check extension).
-        child_depth = depth if in_check else depth - 1
+        child_depth = depth - 1
 
         for move in ordered:
             board.push(move)
             try:
-                score = -self._negamax(board, child_depth, -beta, -alpha, ply + 1)
+                score = -self._negamax(board, child_depth, -beta, -alpha, ply + 1, is_null=False)
             finally:
                 board.pop()
 
@@ -256,6 +302,19 @@ class Searcher:
     def _quiescence(self, board: chess.Board, alpha: int, beta: int, ply: int) -> int:
         self._check_time()
         self.nodes += 1
+
+        # Transposition hit: reuse an exact score computed earlier in this
+        # search (entries with depth >= 0 are ply-independent because mate
+        # scores are never cached here).
+        key = self._tt_key(board)
+        entry = self.tt.get(key)
+        if (
+            entry is not None
+            and entry[3] == EXACT
+            and entry[2] < MATE_THRESHOLD
+            and entry[2] > -MATE_THRESHOLD
+        ):
+            return entry[2]
 
         stand_pat = evaluate_for_turn(board)
         if stand_pat >= beta:
@@ -295,6 +354,11 @@ class Searcher:
                 alpha = score
             if alpha >= beta:
                 break
+
+        # Cache the resolved stand-pat so repeated leaf positions are free.
+        # Never overwrite a deeper (interior) entry.
+        if abs(best) < MATE_THRESHOLD and (entry is None or entry[1] < 0):
+            self.tt[key] = (None, 0, best, EXACT)
         return best
 
     # ------------------------------------------------------------------ #
@@ -349,8 +413,24 @@ class Searcher:
             raise SearchAborted
 
     @staticmethod
-    def _tt_key(board: chess.Board) -> str:
+    def _tt_key(board: chess.Board) -> object:
+        # The transposition key excludes the halfmove/fullmove counters (they
+        # do not change the search result) and is far cheaper than serialising
+        # a whole FEN string on every single node.
+        key = getattr(board, "_transposition_key", None)
+        if key is not None:
+            return key()
         return board.fen()
+
+    @staticmethod
+    def _has_non_pawn_material(board: chess.Board, color: bool) -> bool:
+        """False only in king+pawn endgames, where null-move fails (zugzwang)."""
+        return bool(
+            board.pieces(chess.KNIGHT, color)
+            | board.pieces(chess.BISHOP, color)
+            | board.pieces(chess.ROOK, color)
+            | board.pieces(chess.QUEEN, color)
+        )
 
     def _extract_pv(self, board: chess.Board, first: chess.Move) -> list[chess.Move]:
         """Walk the transposition table to rebuild the principal variation."""

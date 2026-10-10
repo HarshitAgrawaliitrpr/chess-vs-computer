@@ -1,4 +1,4 @@
-"""Static evaluation for the negamax search.
+﻿"""Static evaluation for the negamax search.
 
 Scores are centipawns from White's point of view (the same convention used by
 chess.js / Stockfish) so the API layer can report them directly.  The search
@@ -127,46 +127,56 @@ TABLES: dict[int, tuple[int, ...]] = {
 }
 
 
+def _iter_squares(bitboard: int):
+    """Yield every square set in a bitboard (lowest first), no dict building."""
+    while bitboard:
+        lowest = bitboard & -bitboard
+        yield lowest.bit_length() - 1
+        bitboard ^= lowest
+
+
 def evaluate(board: chess.Board) -> int:
     """Return a static evaluation in centipawns (White - Black)."""
     score = 0
     phase_weight = 0
-    white_bishops = 0
-    black_bishops = 0
 
-    for square, piece in board.piece_map().items():
-        piece_type = piece.piece_type
-        if piece_type == chess.KING:
-            continue  # kings are scored with tapered tables below
+    # Material + placement, via bitboards (avoids constructing a piece dict
+    # for every leaf node - this is the hottest code in the whole engine).
+    for piece_type in (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN):
+        white = board.pieces_mask(piece_type, chess.WHITE)
+        black = board.pieces_mask(piece_type, chess.BLACK)
+        if not white and not black:
+            continue
 
-        index = square ^ 56 if piece.color == chess.WHITE else square
-        value = PIECE_VALUE[piece_type] + TABLES[piece_type][index]
-        score += value if piece.color == chess.WHITE else -value
+        table = TABLES[piece_type]
+        value = PIECE_VALUE[piece_type]
+        phase_weight += PHASE_WEIGHT[piece_type] * (
+            chess.popcount(white) + chess.popcount(black)
+        )
 
-        phase_weight += PHASE_WEIGHT[piece_type]
-        if piece_type == chess.BISHOP:
-            if piece.color == chess.WHITE:
-                white_bishops += 1
-            else:
-                black_bishops += 1
+        for square in _iter_squares(white):
+            score += value + table[square ^ 56]
+        for square in _iter_squares(black):
+            score -= value + table[square]
 
-    if white_bishops >= 2:
+    if chess.popcount(board.pieces_mask(chess.BISHOP, chess.WHITE)) >= 2:
         score += BISHOP_PAIR_BONUS
-    if black_bishops >= 2:
+    if chess.popcount(board.pieces_mask(chess.BISHOP, chess.BLACK)) >= 2:
         score -= BISHOP_PAIR_BONUS
 
-    # Tapered king placement: blend middlegame/endgame tables by remaining phase.
-    phase = min(phase_weight, 24) / 24.0
+    # Tapered king placement: blend middlegame/endgame tables by remaining
+    # phase. Integer maths only - this runs millions of times per search.
+    phase = min(phase_weight, 24)
     white_king = board.king(chess.WHITE)
     black_king = board.king(chess.BLACK)
-    white_king_score = round(
+    white_king_score = (
         KING_MIDGAME_TABLE[white_king ^ 56] * phase
-        + KING_ENDGAME_TABLE[white_king ^ 56] * (1.0 - phase)
-    )
-    black_king_score = round(
+        + KING_ENDGAME_TABLE[white_king ^ 56] * (24 - phase)
+    ) // 24
+    black_king_score = (
         KING_MIDGAME_TABLE[black_king] * phase
-        + KING_ENDGAME_TABLE[black_king] * (1.0 - phase)
-    )
+        + KING_ENDGAME_TABLE[black_king] * (24 - phase)
+    ) // 24
     score += white_king_score - black_king_score
 
     return score
