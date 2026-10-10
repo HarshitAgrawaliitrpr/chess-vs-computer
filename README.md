@@ -69,6 +69,16 @@ cd frontend && npm test       # engine client + game hook tests
 engine and asserts it finds the forced mate (back-rank mate in one, two-rook
 mate in two, promotion choice, time-limit compliance).
 
+### Strength check (self-play)
+
+```bash
+cd backend && python scripts/selfplay.py 40   # easy vs master, both colours
+```
+
+Plays the two extreme profiles against each other with the production time
+budgets and fails (exit 1) if the weaker profile ever beats the stronger one
+— a monotonicity guard for the difficulty ladder.
+
 ## CI/CD
 
 `.harness/pipeline.yaml` runs on every push (default trigger):
