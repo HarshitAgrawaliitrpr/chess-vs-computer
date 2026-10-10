@@ -12,7 +12,10 @@ export default function App() {
       </header>
       <ChessGame />
       <footer className="app__footer">
-        <span>Move validation: castling, en passant, promotion, 50&#8209;move rule, threefold repetition</span>
+        <span className="app__credit">CREATED BY HARSHIT AGRAWAL WITH MIMO</span>
+        <span>
+          Move validation: castling, en passant, promotion, 50&#8209;move rule, threefold repetition
+        </span>
       </footer>
     </div>
   );

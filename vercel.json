@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd frontend && npm ci --no-audit --no-fund && npm run build",
+  "framework": null,
+  "functions": {
+    "main.py": {
+      "maxDuration": 30,
+      "excludeFiles": "{frontend/node_modules/**,frontend/src/**,backend/tests/**,backend/scripts/**,.git/**,**/__pycache__/**,.pytest_cache/**,.harness/**,screenshots/**,.playwright-mcp/**}"
+    }
+  }
+}

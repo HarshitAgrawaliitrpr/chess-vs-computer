@@ -1,0 +1,4 @@
+# Runtime dependencies for the Vercel serverless function (root entrypoint).
+fastapi>=0.115,<1.0
+pydantic>=2.10,<3.0
+python-chess>=1.10,<2.0

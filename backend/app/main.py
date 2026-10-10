@@ -136,3 +136,25 @@ def engine_move(request: MoveRequest) -> SearchResultModel:
         difficulty=profile.name,
         elo_estimate=profile.elo,
     )
+
+
+# ---------------------------------------------------------------------------
+# Single-server frontend hosting (Vercel and all-in-one deployments).
+#
+# Vercel loads the root `main.py` entrypoint, which re-exports this `app`, and
+# the build command produces `frontend/dist`. The routes above are declared
+# before this mount, so `/api/*` always wins; everything else is the React app.
+# On the normal dev flow (Vite dev server + uvicorn) the block only activates
+# if you have explicitly run `npm run build`.
+# ---------------------------------------------------------------------------
+_STATIC_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+)
+
+if os.path.isdir(_STATIC_DIR):
+    if hasattr(app, "frontend"):
+        app.frontend("/", directory=_STATIC_DIR, fallback="index.html")
+    else:  # pragma: no cover - FastAPI builds older than app.frontend()
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="frontend")

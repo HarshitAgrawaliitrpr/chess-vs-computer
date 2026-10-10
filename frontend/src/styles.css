@@ -36,7 +36,15 @@ body {
 
 .app__header p { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; }
 .app__header code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
-.app__footer { margin-top: 26px; color: var(--muted); font-size: 0.85rem; text-align: center; }
+.app__footer { margin-top: 26px; color: var(--muted); font-size: 0.85rem; text-align: center; display: flex; flex-direction: column; gap: 6px; }
+
+.app__credit {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
 
 .game {
   display: grid;

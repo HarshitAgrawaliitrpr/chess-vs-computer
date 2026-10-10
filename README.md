@@ -99,3 +99,36 @@ comments inside the pipeline file.
 
 > Stages do not share a filesystem in Harness Open Source, so each stage
 > installs its own dependencies from a fresh checkout.
+
+## Deploy to Vercel (full website, one project)
+
+The repo is set up so a single Vercel project serves **both** the React
+frontend and the FastAPI engine API on one domain:
+
+| File | Role |
+|---|---|
+| `main.py` (root) | Vercel entrypoint — re-exports the FastAPI `app` |
+| `requirements.txt` (root) | serverless runtime deps (`fastapi`, `python-chess`, `pydantic`) |
+| `vercel.json` | `buildCommand` runs `npm ci && npm run build` in `frontend/`; `maxDuration: 30` for the engine search |
+| `backend/app/main.py` | `app.frontend("/", ...)` serves `frontend/dist` — `/api/*` routes are declared first so they always win |
+
+Request flow on Vercel:
+
+```
+GET  /                -> CDN (built React app)
+POST /api/engine/move -> Python function (minimax search, <= 3.5s per difficulty)
+```
+
+Deploy from your machine:
+
+```bash
+npm install -g vercel
+vercel login                 # or export VERCEL_TOKEN=...
+vercel --prod                # deploy the current repo as-is
+```
+
+Pushing to `main` can also trigger automatic redeploys once the Vercel
+project is connected to the GitHub repository.
+
+> Created by **Harshit Agrawal with MiMo** — the credit line is rendered in the
+> app footer.
