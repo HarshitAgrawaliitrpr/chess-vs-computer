@@ -174,4 +174,50 @@ describe("useChessGame", () => {
     await wait(() => expect(result.current.moves).toEqual(["e4", "e5"]));
     expect(result.current.canMove).toBe(true);
   });
+
+  // ---- result classification (drives the win/loss overlay) ----
+
+  const BACK_RANK_MATE = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1";
+  const STALEMATE = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
+
+  it("reports a win when the human delivers checkmate, and clears on restart", () => {
+    const engine = fakeEngine();
+    const { result } = renderHook(() => useChessGame({ engine, playerColor: "w" }));
+
+    expect(result.current.result).toBeNull(); // game still running
+
+    act(() => result.current.loadFen(BACK_RANK_MATE));
+    act(() => {
+      expect(result.current.onPieceDrop("a1", "a8")).toBe(true); // 1. Ra8#
+    });
+
+    expect(result.current.status.kind).toBe("checkmate");
+    expect(result.current.result).toBe("win");
+
+    act(() => result.current.startGame("w")); // retry from the overlay
+    expect(result.current.result).toBeNull();
+    expect(result.current.moves).toEqual([]);
+  });
+
+  it("reports a loss when the engine delivers checkmate", async () => {
+    const engine = fakeEngine([{ from: "a1", to: "a8", san: "Ra8", uci: "a1a8", promotion: null }]);
+    const { result } = renderHook(() => useChessGame({ engine, playerColor: "b" }));
+
+    act(() => result.current.loadFen(BACK_RANK_MATE));
+    act(() => {
+      void result.current.requestComputerMove(); // computer (White) delivers mate
+    });
+
+    await wait(() => expect(result.current.status.kind).toBe("checkmate"));
+    expect(result.current.result).toBe("loss");
+  });
+
+  it("classifies every draw variant as a draw", () => {
+    const engine = fakeEngine();
+    const { result } = renderHook(() => useChessGame({ engine, playerColor: "w" }));
+
+    act(() => result.current.loadFen(STALEMATE)); // stalemate
+    expect(result.current.status.kind).toBe("stalemate");
+    expect(result.current.result).toBe("draw");
+  });
 });

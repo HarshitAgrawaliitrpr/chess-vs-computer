@@ -1,13 +1,21 @@
+import { useEffect, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import StatusBar from "./StatusBar.jsx";
 import MoveHistory from "./MoveHistory.jsx";
 import CapturedPieces from "./CapturedPieces.jsx";
 import DifficultySelector from "./DifficultySelector.jsx";
 import EngineStats from "./EngineStats.jsx";
+import GameOverOverlay from "./GameOverOverlay.jsx";
 import { useChessGame } from "../hooks/useChessGame.js";
 
 export default function ChessGame() {
   const game = useChessGame();
+  const [resultDismissed, setResultDismissed] = useState(false);
+
+  // A fresh game (or a color switch) always brings the dialog back next time.
+  useEffect(() => {
+    if (!game.status.over) setResultDismissed(false);
+  }, [game.status.over]);
 
   return (
     <div className="game">
@@ -51,6 +59,15 @@ export default function ChessGame() {
 
         <EngineStats info={game.engineInfo} thinking={game.thinking} />
       </aside>
+
+      {game.result && !resultDismissed && (
+        <GameOverOverlay
+          outcome={game.result}
+          playerColor={game.playerColor}
+          onRetry={() => game.startGame(game.playerColor)}
+          onDismiss={() => setResultDismissed(true)}
+        />
+      )}
     </div>
   );
 }

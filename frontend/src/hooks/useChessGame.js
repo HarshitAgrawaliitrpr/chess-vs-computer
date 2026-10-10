@@ -45,6 +45,20 @@ function summarizeCaptures(verboseHistory) {
   return { capturedByWhite, capturedByBlack, advantage: score(capturedByWhite) - score(capturedByBlack) };
 }
 
+/**
+ * Player-centric outcome of a finished game: `"win" | "loss" | "draw"`.
+ * Only checkmate has a winner; every draw variant reports `"draw"`.
+ * Returns `null` while the game is still running.
+ */
+function describeResult(status, playerColor) {
+  if (!status.over) return null;
+  if (status.kind !== "checkmate") return "draw";
+  // On checkmate the mated side is the one to move, so the winner is the other color.
+  const winner = status.turn === "white" ? "black" : "white";
+  const playerSide = playerColor === "b" ? "black" : "white";
+  return winner === playerSide ? "win" : "loss";
+}
+
 function snapshot(game) {
   const verbose = game.history({ verbose: true });
   const captures = summarizeCaptures(verbose);
@@ -189,6 +203,7 @@ export function useChessGame({
     thinking,
     error,
     engineInfo,
+    result: describeResult(gameState.status, playerColor),
     canMove: !gameState.status.over && !thinking && gameState.status.turn === (playerColor === "b" ? "black" : "white"),
     onPieceDrop,
     startGame,
