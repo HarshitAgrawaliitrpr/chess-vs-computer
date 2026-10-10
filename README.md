@@ -133,9 +133,9 @@ vercel login                 # or export VERCEL_TOKEN=...
 vercel deploy --yes --prod
 ```
 
-To auto-deploy on every push to `main`, connect the repository with
-`vercel git connect` (a GitHub login connection must exist in your Vercel
-account settings first).
+Auto-deploy is connected: every push to `main` triggers a production build
+on Vercel (verified — push to READY in ~30s, no credentials needed beyond
+the repository's webhook).
 
 > Created by **Harshit Agrawal with MiMo** — the credit line is rendered in the
 > app footer.
