@@ -79,6 +79,10 @@ Plays the two extreme profiles against each other with the production time
 budgets and fails (exit 1) if the weaker profile ever beats the stronger one
 — a monotonicity guard for the difficulty ladder.
 
+Last run (40-ply cap, both colours): **master won 2/2** —
+`master` averaged depth 5.6–6.1 at ~2.8 s/move, `easy` stayed at depth 1 in
+single-digit milliseconds.
+
 ## CI/CD
 
 `.harness/pipeline.yaml` runs on every push (default trigger):
