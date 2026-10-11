@@ -32,6 +32,33 @@ increasing where users actually play** — an earlier calibration had `hard`
 and `master` both capped at depth 4 in production, playing identical moves
 behind different Elo labels.
 
+## NNUE evaluator (trained 2026-10-11, opt-in)
+
+The engine can score positions with a small neural net instead of the
+hand-written evaluation:
+
+- **Architecture**: 768 → 32 (ReLU) → 1, side-to-move relative
+  (2 perspectives × 6 piece types × 64 squares, kings excluded; the
+  "black view" flips ranks). Search keeps **incremental accumulators**
+  (copy-on-write stack; ~5 µs/push, ~0.8 µs forward vs ~11 µs for the
+  hand eval), with a scratch rebuild fallback covered by a property test.
+- **Training data**: 1,496 self-play games by the engine itself
+  (depth 3 + quiescence teacher, 400 ms and 300 ms budgets, ±14 cp
+  selection noise; labels are the clean pre-noise score of the chosen
+  move) → 177,893 unique positions, mirror-augmented to 355,786 samples.
+- **Training**: 20 epochs, Huber(δ=1) on cp/400, Adam 3e-3 with linear
+  decay (`backend/scripts/nnue_train.py`). Final: val MAE 172 cp,
+  Pearson r = 0.925 vs teacher scores.
+- **Validation** (`backend/scripts/nnue_validate.py`): tactics **6/6**,
+  head-to-head at equal depth vs the hand evaluator **9 wins – 5 losses
+  (64 %)** with 6 games unfinished, and **97 % nps parity**. Startpos
+  evaluates at −6 cp (no material bias).
+- **Enable**: set `EVAL_BACKEND=nnue` (and optionally `NNUE_WEIGHTS` to a
+  different JSON) — production ships `hand` by default; `/api/health`
+  reports which evaluator is active. Retrain anytime:
+  `python scripts/nnue_data.py … && python scripts/nnue_train.py …`
+  (the weights JSON stays committed; regenerate then commit).
+
 ## Run locally
 
 ### Backend

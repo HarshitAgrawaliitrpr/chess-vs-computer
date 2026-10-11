@@ -31,9 +31,15 @@ Vercel.
       (paused when tab hidden), auto-queen, resign/cancel, refresh-resume via
       localStorage; results written for BOTH players into history + leaderboard
       (`difficulty='online'`); prod E2E verified live
-- [x] Tests: 43 backend (pytest) + 53 frontend (vitest) — all green
+- [x] Tests: 52 backend (pytest) + 53 frontend (vitest) — all green
+- [x] **NNUE evaluator v1** (2026-10-11): 768→32→1 numpy net distilled from
+      1,496 self-play games (177,893 unique positions, depth-3+qsearch labels);
+      validation: tactics 6/6, ladder 9W-5L=64% vs hand eval at equal depth,
+      97% nps parity; ships behind `EVAL_BACKEND=nnue` (weights committed at
+      `backend/app/engine/weights/nnue-32-v1.json`; health reports `eval_backend`)
 - [ ] Optional: Google button (needs GOOGLE_CLIENT_ID env var in Vercel; see README)
-- [ ] Next: **NNUE evaluator** (user asked for it right after multiplayer)
+- [ ] Optional: enable `EVAL_BACKEND=nnue` in Vercel (needs token/dashboard;
+      prod currently runs `hand` — deliberately, until the env flip is done)
 - [x] Security: all temporary tokens (Vercel, Turso CLI-less flow) revoked/verified dead
 
 ## Where things live
@@ -43,6 +49,16 @@ Vercel.
   leaderboard + `online_games`), `security.py` (bcrypt/JWT/Google),
   `routes_auth.py`, `routes_games.py`, `routes_leaderboard.py`,
   `routes_online.py` (create/join/poll/move/resign/cancel)
+- Engine: `backend/app/engine/` — `search.py` (alpha-beta + qsearch + TT,
+  `_push`/`_pop`/`_evaluate` switch evaluator per position), `nnue.py`
+  (incremental accumulator net; `EVAL_BACKEND=nnue` activates,
+  `NNUE_WEIGHTS` overrides the path, default `weights/nnue-32-v1.json`),
+  `weights/nnue-32-v1.json` (trained net, committed)
+- NNUE pipeline: `backend/scripts/nnue_data.py` (self-play generator,
+  `--games/--workers/--time-ms/--seed-base/--out`, JSONL shards),
+  `nnue_train.py` (numpy MLP, Huber on cp/400, w2/b2×400 at save,
+  mirror-augmented, torn-line tolerant loader), `nnue_validate.py`
+  (tactics + parallel head-to-head ladder + speed probe)
 - Frontend: `frontend/src/` — `auth/AuthContext.jsx`, `api/authClient.js`,
   `api/onlineClient.js`, `components/LoginScreen.jsx`,
   `components/GameHistory.jsx`, `components/OnlinePlay.jsx` (lobby/waiting/board),
@@ -101,11 +117,18 @@ Vercel.
     server-side by replaying the stored PGN (so threefold repetition works)
     and committed with `WHERE fen = <expected>` so two simultaneous writers
     can't both win the race (loser gets 409).
+13. **Killing a multiprocessing pool's parent on Windows orphans its spawn
+    children** — they keep burning CPU (11 workers survived `Stop-Process` of
+    the main gen process). Match `CommandLine -match "spawn_main"` to kill
+    them; leave other pythons alone (VSCode/Jupyter kernels live there too).
+    Also: worker shard files flush in ~8KB blocks — mid-run byte deltas over
+    a 60s window are the honest progress metric (line counts on a file being
+    written can read as 0).
 
 ## Dev commands
 
 ```bash
-cd backend  && python -m pytest          # 43 tests
+cd backend  && python -m pytest          # 52 tests
 cd frontend && npx vitest run            # 53 tests
 cd frontend && npx eslint src            # lint
 cd frontend && npm run build             # production bundle
@@ -114,8 +137,10 @@ cd backend  && uvicorn app.main:app --reload --port 8000
 
 ## Ideas queued
 
-Multiplayer + leaderboard — DONE (2026-10-11). Next up per user: **NNUE
-evaluator** (train a small net in numpy to replace/augment the hand-written
-eval; needs self-play data + eval flag + tactics validation before flipping).
-Other ideas: sound effects, mobile polish, Google login completion, move
-annotations for the engine (why did it play that).
+Multiplayer + leaderboard — DONE (2026-10-11). **NNUE evaluator v1 — DONE**
+(2026-10-11): trained + validated, ships behind `EVAL_BACKEND=nnue`; prod
+enablement pending the env flip (see checklist). Ideas for v2: larger hidden
+layer (64), softer labels (weight by depth), more data (5k+ games), and a
+quantized/int8 accumulator if pure-Python speed ever matters. Other ideas:
+sound effects, mobile polish, Google login completion, move annotations for
+the engine (why did it play that).

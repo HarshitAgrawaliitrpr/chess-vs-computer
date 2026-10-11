@@ -466,7 +466,7 @@ for line in [
 # ---------------------------------------------------------------------------
 # 11. Timeline and roadmap
 # ---------------------------------------------------------------------------
-h1("11. Timeline and Roadmap")
+h1("11. Timeline, NNUE and Roadmap")
 h2("Shipped, in order")
 for line in [
     "Game + engine + tests + Harness CI/CD pipeline + Docker packaging.",
@@ -477,12 +477,22 @@ for line in [
     "Leaderboard with points, difficulty filter and top-3 medals.",
     "Engine strength fixes: quiescence mate detection + production-calibrated budgets.",
     "Online multiplayer: invite codes/links, server-validated moves, polling, resume.",
+    "NNUE evaluator v1: 768-32-1 net distilled from 1,496 self-play games, validated.",
+]:
+    bullet(line)
+h2("NNUE evaluator v1 - results (2026-10-11)")
+for line in [
+    "Data: 1,496 engine self-play games (depth 3 + quiescence teacher, +/-14 cp",
+    "selection noise, labels are clean pre-noise scores) = 177,893 unique positions.",
+    "Training: 20 epochs, Huber on cp/400, Adam - final val MAE 172 cp, Pearson r 0.925.",
+    "Tactics suite 6/6 (mates, free-queen, quiet moves); startpos evaluates -6 cp.",
+    "Head-to-head at equal depth vs the hand evaluator: 9 wins - 5 losses (64%),",
+    "97% nodes-per-second parity; activates via EVAL_BACKEND=nnue (prod stays 'hand').",
 ]:
     bullet(line)
 h2("Ideas for next")
 for line in [
-    "NNUE evaluator: train a small network on self-play positions to replace the",
-    "hand-written evaluation; ship behind a flag until tactics + self-play prove it.",
+    "NNUE v2: larger hidden layer, depth-weighted labels, more self-play data.",
     "Complete Google sign-in (create OAuth client ID, set GOOGLE_CLIENT_ID).",
     "Clocks and draw offers for online games; sound effects; mobile polish.",
     "Seasonal leaderboards, rating changes per game (Elo from the games table).",
