@@ -25,3 +25,7 @@ venv/
 
 # Generated report (rebuild with docs/generate_report.py)
 /PROJECT_OVERVIEW.pdf
+
+# NNUE training data (regenerable via scripts/nnue_data.py; trained
+# weights in backend/app/engine/weights/ ARE committed)
+backend/data/
