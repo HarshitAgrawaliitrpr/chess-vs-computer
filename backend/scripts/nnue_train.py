@@ -45,7 +45,10 @@ def load_rows(data_dir: str) -> dict[str, int]:
                 line = line.strip()
                 if not line:
                     continue
-                item = json.loads(line)
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue  # shard still being written; skip the torn line
                 out.setdefault(item["fen"], int(item["score"]))
     return out
 
