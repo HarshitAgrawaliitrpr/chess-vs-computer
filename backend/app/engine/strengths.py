@@ -3,13 +3,26 @@
 Each profile couples a **maximum** search depth with a wall-clock budget. The
 engine always returns the best move of the deepest *completed* depth, so the
 depth is an upper bound: dense middlegame positions settle at a lower depth
-than open ones within the same budget (typical measured depths below).
+than open ones within the same budget.
 
-    profile  max depth  time budget  noise   typical depth reached   ~Elo
-    easy     1          150 ms       60 cp   1                       750
-    medium   3          700 ms       15 cp   2-3                     1250
-    hard     5          1800 ms      0       4-5                     1650
-    master   7          3500 ms      0       4-6                     2000
+The budgets are tuned for the CPU that actually runs the games - Vercel's
+serverless CPU is roughly 4x slower than a dev laptop, and before this
+tuning `hard` and `master` BOTH hit their caps at depth 4 in production
+(identical moves, identical strength behind different Elo labels). The
+numbers below guarantee a strict ladder where the user plays:
+
+    profile  max depth  time budget  noise   prod depth*  ~Elo
+    easy     1          150 ms       60 cp   1            750
+    medium   3          1000 ms      15 cp   3            1250
+    hard     5          2500 ms      0       4            1650
+    master   7          8000 ms      0       5            2000
+
+    * typical completed depth on production serverless hardware in dense
+      middlegames; fast positions and local dev machines go deeper.
+
+On a fast machine the same budgets reach the full caps (hard=5, master=6-7).
+The wall-clock budget is only a safety net behind the depth cap - it may
+never cut a level so low that it collapses onto the level below it.
 
 The gaussian noise on the weaker levels makes them behave like a human
 beginner (occasional sub-optimal moves) instead of a rigid 1-ply bot, while
@@ -44,7 +57,7 @@ PROFILES: dict[str, EngineProfile] = {
         name="medium",
         label="Club player",
         max_depth=3,
-        time_limit_ms=700,
+        time_limit_ms=1000,
         noise_cp=15,
         elo=1250,
     ),
@@ -52,7 +65,7 @@ PROFILES: dict[str, EngineProfile] = {
         name="hard",
         label="Strong club player",
         max_depth=5,
-        time_limit_ms=1800,
+        time_limit_ms=2500,
         noise_cp=0,
         elo=1650,
     ),
@@ -60,7 +73,7 @@ PROFILES: dict[str, EngineProfile] = {
         name="master",
         label="Expert",
         max_depth=7,
-        time_limit_ms=3500,
+        time_limit_ms=8000,
         noise_cp=0,
         elo=2000,
     ),

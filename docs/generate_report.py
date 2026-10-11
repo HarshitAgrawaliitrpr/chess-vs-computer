@@ -187,11 +187,19 @@ table(
     ["Profile", "Max depth", "Time budget", "Noise", "Approx. Elo"],
     [
         ["easy", "1", "150 ms", "60 cp", "~750 (beginner)"],
-        ["medium", "3", "700 ms", "15 cp", "~1250 (casual club)"],
-        ["hard", "5", "1800 ms", "0", "~1650 (solid club)"],
-        ["master", "7", "3500 ms", "0", "~2000 (expert)"],
+        ["medium", "3", "1000 ms", "15 cp", "~1250 (casual club)"],
+        ["hard", "5", "2500 ms", "0", "~1650 (solid club)"],
+        ["master", "7", "8000 ms", "0", "~2000 (expert)"],
     ],
     [26, 24, 30, 22, 70],
+)
+para(
+    "Budgets are calibrated against the production CPU: Vercel's serverless cores run "
+    "roughly 4x slower than a dev laptop, and a naive calibration once let hard and "
+    "master BOTH cap at depth 4 in production - identical moves behind different Elo "
+    "labels. With the current numbers the ladder stays strictly increasing where "
+    "users actually play: depth 1 / 3 / 4 / 5 for easy / medium / hard / master "
+    "(fast local machines reach the full caps: 1 / 3 / 5 / 6-7)."
 )
 para(
     "A self-play guard (scripts/selfplay.py) pits easy vs master with production time "
@@ -374,6 +382,11 @@ for line in [
     "onPieceDrop keeps pieces in place - which is exactly what pre-moves need.",
     "Pre-move design: single-slot queue + engine loop that answers the human move,",
     "applies the queued pre-move, then answers again; illegal pre-moves are discarded.",
+    "Quiescence mate blind spot: a mated position on the search horizon used to score",
+    "as a ~500cp static eval instead of -MATE, so easy NEVER saw a mate and every",
+    "level was one ply late on tactics; also never stand-pat while in check.",
+    "Serverless calibration: measure depth achieved in PRODUCTION, not just locally -",
+    "wall-clock budgets tuned on a fast laptop collapsed hard/master to the same depth.",
     "Test ergonomics: no jest-dom (plain DOM assertions), user-event for realistic",
     "clicks/submits, and assertions must respect React act() batching.",
 ]:

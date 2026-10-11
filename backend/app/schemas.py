@@ -150,3 +150,44 @@ class LeaderboardEntry(BaseModel):
     losses: int
     points: float
     win_rate: float = Field(..., description="Win percentage, 0-100.")
+
+
+# ---------------------------------------------------------------------------
+# Online multiplayer (server-authoritative, polling transport)
+# ---------------------------------------------------------------------------
+
+OnlineGameStatus = Literal["waiting", "active", "over", "cancelled"]
+
+
+class OnlineJoinRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6, description="6-char invite code.")
+
+
+class OnlineMoveRequest(BaseModel):
+    from_square: str = Field(alias="from", min_length=2, max_length=2)
+    to_square: str = Field(alias="to", min_length=2, max_length=2)
+    promotion: Optional[Literal["q", "r", "b", "n"]] = None
+
+    model_config = {"populate_by_name": True}
+
+
+class OnlineGameOut(BaseModel):
+    """Full game state; `result` is always from the requesting player's view."""
+
+    id: str
+    code: str
+    status: OnlineGameStatus
+    fen: str
+    pgn: str
+    moves: List[str] = Field(default_factory=list, description="SAN move list.")
+    last_move: Optional[str] = None  # UCI, for board highlighting
+    my_color: Literal["w", "b"]
+    white_name: str
+    black_name: Optional[str] = None
+    opponent_name: Optional[str] = None
+    turn: Literal["w", "b"]
+    winner: Optional[Literal["w", "b"]] = None
+    result: Optional[GameOutcome] = None
+    result_detail: Optional[str] = None
+    created_at: str
+    updated_at: str

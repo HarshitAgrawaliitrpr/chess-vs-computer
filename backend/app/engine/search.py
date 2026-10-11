@@ -316,18 +316,29 @@ class Searcher:
         ):
             return entry[2]
 
-        stand_pat = evaluate_for_turn(board)
-        if stand_pat >= beta:
-            return stand_pat
-        if stand_pat > alpha:
-            alpha = stand_pat
-        if ply >= MAX_QUIESCENCE_PLY:
-            return stand_pat
-
-        if board.is_check():
-            # In check we must consider every legal evasion.
+        in_check = board.is_check()
+        if in_check:
+            # No stand-pat while in check: the king is under attack, so a
+            # static "I am up material" score says nothing about survival.
+            # Every evasion must be searched - and if there is none, the
+            # position is checkmate ON THE HORIZON. Without this branch a
+            # mate landing on the last searched ply scores as a mere static
+            # eval (~500cp) instead of -MATE_SCORE, so the engine misses
+            # forced mates entirely at low depths (easy never sees one).
             moves = list(board.legal_moves)
+            if not moves:
+                return -MATE_SCORE + ply
+            if ply >= MAX_QUIESCENCE_PLY:
+                return evaluate_for_turn(board)  # bounded at the ply limit
+            stand_pat: Optional[int] = None
         else:
+            stand_pat = evaluate_for_turn(board)
+            if stand_pat >= beta:
+                return stand_pat
+            if stand_pat > alpha:
+                alpha = stand_pat
+            if ply >= MAX_QUIESCENCE_PLY:
+                return stand_pat
             moves = [
                 move
                 for move in board.legal_moves
@@ -335,14 +346,16 @@ class Searcher:
             ]
 
         moves = self._order_moves(board, moves, None, ply)
-        best = stand_pat
+        best = stand_pat if stand_pat is not None else -INF
 
         for move in moves:
-            # Delta pruning: skip captures that cannot raise alpha.
-            victim = board.piece_type_at(move.to_square)
-            if victim is not None and not board.is_check():
-                if stand_pat + PIECE_VALUE[victim] + 200 < alpha:
-                    continue
+            # Delta pruning: skip captures that cannot raise alpha. Never
+            # applies in check (there is no stand-pat to measure against).
+            if stand_pat is not None:
+                victim = board.piece_type_at(move.to_square)
+                if victim is not None:
+                    if stand_pat + PIECE_VALUE[victim] + 200 < alpha:
+                        continue
             board.push(move)
             try:
                 score = -self._quiescence(board, -beta, -alpha, ply + 1)

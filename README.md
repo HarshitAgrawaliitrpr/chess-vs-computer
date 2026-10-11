@@ -13,17 +13,24 @@ engine, wrapped in a Harness Open Source (Gitness) CI/CD pipeline.
 
 ## Difficulty ladder
 
-| Profile  | Max depth | Time budget | Noise  | Typical depth reached | Approx. Elo |
+| Profile  | Max depth | Time budget | Noise  | Depth in production* | Approx. Elo |
 |----------|-----------|-------------|--------|----------------------|-------------|
 | `easy`   | 1         | 150 ms      | 60 cp  | 1                    | ~750 (beginner) |
-| `medium` | 3         | 700 ms      | 15 cp  | 2-3                  | ~1250 (casual club) |
-| `hard`   | 5         | 1800 ms     | 0      | 4-5                  | ~1650 (solid club) |
-| `master` | 7         | 3500 ms     | 0      | 4-6                  | ~2000 (expert) |
+| `medium` | 3         | 1000 ms     | 15 cp  | 3                    | ~1250 (casual club) |
+| `hard`   | 5         | 2500 ms     | 0      | 4                    | ~1650 (solid club) |
+| `master` | 7         | 8000 ms     | 0      | 5                    | ~2000 (expert) |
 
 Depth is an **upper bound**: the search stops when the wall-clock budget runs
 out and always returns the best move of the deepest *completed* depth, so a
 time cut-off never returns a half-analysed move. Dense middlegame positions
 settle at a lower depth than open ones, exactly like a real time-controlled game.
+
+\* measured on Vercel's serverless CPU (≈4x slower than a dev laptop) in dense
+middlegames; on a fast local machine the same budgets reach the full caps
+(hard = 5, master = 6-7). Budgets are tuned so the ladder stays **strictly
+increasing where users actually play** — an earlier calibration had `hard`
+and `master` both capped at depth 4 in production, playing identical moves
+behind different Elo labels.
 
 ## Run locally
 

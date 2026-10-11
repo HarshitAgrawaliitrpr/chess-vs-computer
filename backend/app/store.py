@@ -39,6 +39,24 @@ _SCHEMA = (
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_games_user ON games(user_id, created_at DESC)",
+    """
+    CREATE TABLE IF NOT EXISTS online_games (
+        id TEXT PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        white_id TEXT NOT NULL,
+        black_id TEXT,
+        status TEXT NOT NULL,
+        fen TEXT NOT NULL,
+        pgn TEXT NOT NULL,
+        last_uci TEXT,
+        winner TEXT,
+        result_detail TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_online_games_players "
+    "ON online_games(white_id, black_id, status)",
 )
 
 # `NULL` emails (guests) are allowed to repeat: SQLite UNIQUE treats NULLs as
@@ -70,7 +88,16 @@ def ensure_schema() -> None:
             return
         for statement in _SCHEMA:
             db.execute(statement)
+        _migrate_games_table()
         _schema_ready = True
+
+
+def _migrate_games_table() -> None:
+    """Additive migrations for databases created before the column existed."""
+    rows = db.query("PRAGMA table_info(games)")
+    columns = {row[1] for row in rows}
+    if "opponent" not in columns:
+        db.execute("ALTER TABLE games ADD COLUMN opponent TEXT")
 
 
 def ensure_ready() -> None:
@@ -171,6 +198,7 @@ _GAME_COLS = (
     "difficulty",
     "moves_count",
     "created_at",
+    "opponent",
 )
 
 
@@ -184,7 +212,7 @@ def insert_game(user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     created = utc_now()
     db.execute(
         "INSERT INTO games (id, user_id, pgn, result, result_detail, player_color, difficulty, "
-        "moves_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "moves_count, created_at, opponent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             game_id,
             user_id,
@@ -195,6 +223,7 @@ def insert_game(user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             payload["difficulty"],
             payload.get("moves_count", 0),
             created,
+            payload.get("opponent"),
         ),
     )
     return {
@@ -206,14 +235,16 @@ def insert_game(user_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         "difficulty": payload["difficulty"],
         "moves_count": payload.get("moves_count", 0),
         "created_at": created,
+        "opponent": payload.get("opponent"),
     }
 
 
 def list_games(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
     ensure_ready()
     rows = db.query(
-        "SELECT id, pgn, result, result_detail, player_color, difficulty, moves_count, created_at "
-        "FROM games WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+        "SELECT id, pgn, result, result_detail, player_color, difficulty, moves_count, "
+        "created_at, opponent FROM games WHERE user_id = ? "
+        "ORDER BY created_at DESC, id DESC LIMIT ?",
         (user_id, limit),
     )
     return [_game_from_row(row) for row in rows]
@@ -268,3 +299,138 @@ def leaderboard(difficulty: Optional[str] = None, limit: int = 10) -> List[Dict[
             }
         )
     return entries
+
+
+# ---------------------------------------------------------------------------
+# Online multiplayer games
+# ---------------------------------------------------------------------------
+
+_ONLINE_COLS = (
+    "id",
+    "code",
+    "white_id",
+    "black_id",
+    "status",
+    "fen",
+    "pgn",
+    "last_uci",
+    "winner",
+    "result_detail",
+    "created_at",
+    "updated_at",
+)
+
+
+def _online_from_row(row: Tuple[Any, ...]) -> Dict[str, Any]:
+    return dict(zip(_ONLINE_COLS, row[: len(_ONLINE_COLS)]))
+
+
+_ONLINE_SELECT = (
+    "SELECT id, code, white_id, black_id, status, fen, pgn, last_uci, winner, "
+    "result_detail, created_at, updated_at FROM online_games WHERE "
+)
+
+
+def create_online_game(*, white_id: str, code: str, fen: str, pgn: str) -> Dict[str, Any]:
+    ensure_ready()
+    game_id = new_id()
+    now = utc_now()
+    db.execute(
+        "INSERT INTO online_games (id, code, white_id, status, fen, pgn, created_at, updated_at) "
+        "VALUES (?, ?, ?, 'waiting', ?, ?, ?, ?)",
+        (game_id, code, white_id, fen, pgn, now, now),
+    )
+    return get_online_game(game_id)
+
+
+def get_online_game(game_id: str) -> Optional[Dict[str, Any]]:
+    ensure_ready()
+    rows = db.query(_ONLINE_SELECT + "id = ?", (game_id,))
+    return _online_from_row(rows[0]) if rows else None
+
+
+def find_online_game_by_code(code: str) -> Optional[Dict[str, Any]]:
+    ensure_ready()
+    rows = db.query(_ONLINE_SELECT + "code = ?", (code,))
+    return _online_from_row(rows[0]) if rows else None
+
+
+def join_online_game(game_id: str, black_id: str) -> int:
+    """Assign the second player atomically; returns 0 if the seat was taken."""
+    ensure_ready()
+    now = utc_now()
+    return db.execute(
+        "UPDATE online_games SET black_id = ?, status = 'active', updated_at = ? "
+        "WHERE id = ? AND status = 'waiting' AND black_id IS NULL",
+        (black_id, now, game_id),
+    )
+
+
+def update_online_position(
+    game_id: str,
+    *,
+    fen: str,
+    pgn: str,
+    last_uci: Optional[str],
+    status: str,
+    winner: Optional[str],
+    result_detail: Optional[str],
+) -> None:
+    ensure_ready()
+    db.execute(
+        "UPDATE online_games SET fen = ?, pgn = ?, last_uci = ?, status = ?, winner = ?, "
+        "result_detail = ?, updated_at = ? WHERE id = ?",
+        (fen, pgn, last_uci, status, winner, result_detail, utc_now(), game_id),
+    )
+
+
+def cancel_online_game(game_id: str, white_id: str) -> int:
+    """Cancel a waiting game (creator only); returns 0 if it was not waiting."""
+    ensure_ready()
+    return db.execute(
+        "UPDATE online_games SET status = 'cancelled', updated_at = ? "
+        "WHERE id = ? AND white_id = ? AND status = 'waiting'",
+        (utc_now(), game_id, white_id),
+    )
+
+
+def record_online_game_results(
+    *,
+    white_id: str,
+    black_id: Optional[str],
+    white_name: str,
+    black_name: Optional[str],
+    pgn: str,
+    moves_count: int,
+    winner: Optional[str],
+    result_detail: Optional[str],
+) -> None:
+    """Persist the finished game into `games` for BOTH players.
+
+    Recorded as difficulty='online' so the leaderboard's difficulty filter and
+    the history panel pick them up with zero extra plumbing.
+    """
+    for user_id, color, opponent in (
+        (white_id, "w", black_name),
+        (black_id, "b", white_name),
+    ):
+        if not user_id:
+            continue
+        if winner is None:
+            result = "draw"
+        elif winner == color:
+            result = "win"
+        else:
+            result = "loss"
+        insert_game(
+            user_id,
+            {
+                "pgn": pgn,
+                "result": result,
+                "result_detail": result_detail,
+                "player_color": color,
+                "difficulty": "online",
+                "moves_count": moves_count,
+                "opponent": opponent,
+            },
+        )
