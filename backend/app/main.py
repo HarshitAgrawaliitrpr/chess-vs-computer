@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .engine.search import MATE_THRESHOLD, Searcher
 from .engine.strengths import PROFILES, resolve_profile
+from .routes_admin import router as admin_router
 from .routes_auth import router as auth_router
 from .routes_games import router as games_router
 from .routes_leaderboard import router as leaderboard_router
@@ -163,6 +164,7 @@ def engine_move(request: MoveRequest) -> SearchResultModel:
 # so `/api/*` always wins; if the database is unconfigured only these routes
 # degrade to 503 - the engine keeps serving.
 # ---------------------------------------------------------------------------
+app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(games_router)
 app.include_router(leaderboard_router)
