@@ -15,22 +15,26 @@ engine, wrapped in a Harness Open Source (Gitness) CI/CD pipeline.
 
 | Profile  | Max depth | Time budget | Noise  | Depth in production* | Approx. Elo |
 |----------|-----------|-------------|--------|----------------------|-------------|
-| `easy`   | 1         | 150 ms      | 60 cp  | 1                    | ~750 (beginner) |
-| `medium` | 3         | 1000 ms     | 15 cp  | 3                    | ~1250 (casual club) |
-| `hard`   | 5         | 2500 ms     | 0      | 4                    | ~1650 (solid club) |
-| `master` | 7         | 8000 ms     | 0      | 5                    | ~2000 (expert) |
+| `easy`   | 1         | 100 ms      | 60 cp  | 1                    | ~750 (beginner) |
+| `medium` | 3         | 400 ms      | 15 cp  | 3                    | ~1250 (casual club) |
+| `hard`   | 5         | 1800 ms     | 0      | 5                    | ~1650 (solid club) |
+| `master` | 6         | 8000 ms     | 0      | 6                    | ~2000 (expert) |
 
 Depth is an **upper bound**: the search stops when the wall-clock budget runs
 out and always returns the best move of the deepest *completed* depth, so a
 time cut-off never returns a half-analysed move. Dense middlegame positions
 settle at a lower depth than open ones, exactly like a real time-controlled game.
 
-\* measured on Vercel's serverless CPU (≈4x slower than a dev laptop) in dense
-middlegames; on a fast local machine the same budgets reach the full caps
-(hard = 5, master = 6-7). Budgets are tuned so the ladder stays **strictly
-increasing where users actually play** — an earlier calibration had `hard`
-and `master` both capped at depth 4 in production, playing identical moves
-behind different Elo labels.
+\* measured in dense middlegames on the `bom1` (Mumbai) function region —
+functions run **next to the Turso DB (ap-south-1) and next to the players**,
+so network latency per move is minimal. Typical server-side search times:
+easy 6 ms, medium 103 ms, hard 921 ms, master ~5.5 s (its depth-6 cap stops
+the search the moment the answer is deep enough — an earlier depth-7 cap made
+it burn the full 8 s and return depth 6 anyway). easy/medium/hard hit their
+depth cap long before the budget, so their budgets are worst-case safety
+nets only. An earlier calibration (before the NNUE speed-up) had `hard` and
+`master` both capped at depth 4 in production — the ladder is re-measured
+after every engine change.
 
 ## NNUE evaluator (trained 2026-10-11, opt-in)
 

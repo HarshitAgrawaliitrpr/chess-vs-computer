@@ -12,17 +12,26 @@ tuning `hard` and `master` BOTH hit their caps at depth 4 in production
 numbers below guarantee a strict ladder where the user plays:
 
     profile  max depth  time budget  noise   prod depth*  ~Elo
-    easy     1          150 ms       60 cp   1            750
-    medium   3          1000 ms      15 cp   3            1250
-    hard     5          2500 ms      0       4            1650
-    master   7          8000 ms      0       5            2000
+    easy     1          100 ms       60 cp   1            750
+    medium   3          400 ms       15 cp   3            1250
+    hard     5          1800 ms      0       5            1650
+    master   6          8000 ms      0       6            2000
 
-    * typical completed depth on production serverless hardware in dense
-      middlegames; fast positions and local dev machines go deeper.
+    * measured on production serverless hardware (bom1 region) in a
+    dense middlegame, October 2026: easy 6 ms, medium 103 ms,
+    hard 921 ms, master ~5.5 s of search. Fast positions and local dev
+    machines go deeper.
 
-On a fast machine the same budgets reach the full caps (hard=5, master=6-7).
-The wall-clock budget is only a safety net behind the depth cap - it may
-never cut a level so low that it collapses onto the level below it.
+easy/medium/hard hit their DEPTH cap long before the budget (6/103/921
+ms), so their budgets are pure worst-case safety nets - trimmed to
+100/400/1800 ms with 4-16x headroom so a slow instance can never spend
+seconds on a level that already decided what to play. `master` is the
+inverse: its cap (7, October 2026 -> 6) used to sit above what the
+budget could finish, so the engine burned the FULL 8 s attempting depth
+7 and returning depth 6 anyway - capping at 6 lets it stop the moment
+depth 6 completes (~5.5 s typical), same worst case, 2.5 s faster
+typical. The wall-clock budget may never cut a level so low that it
+collapses onto the level below it (master aborting to depth 5 == hard).
 
 The gaussian noise on the weaker levels makes them behave like a human
 beginner (occasional sub-optimal moves) instead of a rigid 1-ply bot, while
@@ -49,7 +58,7 @@ PROFILES: dict[str, EngineProfile] = {
         name="easy",
         label="Beginner",
         max_depth=1,
-        time_limit_ms=150,
+        time_limit_ms=100,
         noise_cp=60,
         elo=750,
     ),
@@ -57,7 +66,7 @@ PROFILES: dict[str, EngineProfile] = {
         name="medium",
         label="Club player",
         max_depth=3,
-        time_limit_ms=1000,
+        time_limit_ms=400,
         noise_cp=15,
         elo=1250,
     ),
@@ -65,14 +74,14 @@ PROFILES: dict[str, EngineProfile] = {
         name="hard",
         label="Strong club player",
         max_depth=5,
-        time_limit_ms=2500,
+        time_limit_ms=1800,
         noise_cp=0,
         elo=1650,
     ),
     "master": EngineProfile(
         name="master",
         label="Expert",
-        max_depth=7,
+        max_depth=6,
         time_limit_ms=8000,
         noise_cp=0,
         elo=2000,
