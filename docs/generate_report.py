@@ -117,7 +117,7 @@ pdf.set_text_color(*DARK)
 pdf.multi_cell(0, 13, "Chess vs. Computer", align="C", new_x="LMARGIN", new_y="NEXT")
 pdf.set_font("Helvetica", "", 14)
 pdf.set_text_color(*GREEN)
-pdf.multi_cell(0, 8, "Full-stack PvE chess with a custom engine,\ncloud accounts and online rankings", align="C", new_x="LMARGIN", new_y="NEXT")
+pdf.multi_cell(0, 8, "Full-stack chess: custom engine, cloud accounts,\nonline multiplayer and rankings", align="C", new_x="LMARGIN", new_y="NEXT")
 pdf.ln(10)
 pdf.set_font("Helvetica", "", 11)
 pdf.set_text_color(*DARK)
@@ -132,8 +132,8 @@ pdf.set_font("Helvetica", "I", 9.5)
 pdf.set_text_color(*MUTED)
 pdf.multi_cell(0, 5.5, (
     "React + Vite frontend, FastAPI backend, minimax/alpha-beta engine,\n"
-    "Turso (libSQL) database, JWT auth, GitHub + Vercel auto-deploy,\n"
-    "Harness Open Source CI/CD pipeline."
+    "online multiplayer over polling, Turso (libSQL) database, JWT auth,\n"
+    "GitHub + Vercel auto-deploy, Harness Open Source CI/CD pipeline."
 ), align="C", new_x="LMARGIN", new_y="NEXT")
 
 # ---------------------------------------------------------------------------
@@ -142,10 +142,11 @@ pdf.multi_cell(0, 5.5, (
 pdf.add_page()
 h1("1. Overview")
 para(
-    "A complete browser chess game where a human plays against a custom-written "
-    "minimax engine with adjustable strength. It ships with accounts (email, Google "
-    "and guest), automatic game saving, a personal history panel and a public "
-    "leaderboard - all running as one Vercel project on a single domain."
+    "A complete browser chess game: play against a custom-written minimax "
+    "engine with adjustable strength, or challenge a friend in real time via "
+    "invite codes. It ships with accounts (email, Google and guest), "
+    "automatic game saving, a personal history panel and a public leaderboard "
+    "- all running as one Vercel project on a single domain."
 )
 table(
     ["Layer", "Technology"],
@@ -167,9 +168,11 @@ for line in [
     "Full move legality (castling, en passant, promotion, 50-move, threefold repetition).",
     "Pre-move queue: drag a move while the engine thinks; it auto-plays when your turn arrives.",
     "Game-over dialog with retry, plus win/loss/draw messaging.",
+    "Online multiplayer: 6-character invite codes / shareable links, server-validated",
+    "moves, live updates by polling, resign, and resume-after-refresh.",
     "Three sign-in options; guests can play and still keep history.",
-    "Every finished game auto-saves; leaderboard ranks players by chess points.",
-    "65 automated tests (34 backend + 39 frontend), lint and production build all green.",
+    "Every finished game auto-saves (vs engine AND online); leaderboard ranks by points.",
+    "96 automated tests (43 backend + 53 frontend), lint and production build all green.",
 ]:
     bullet(line)
 
@@ -223,6 +226,7 @@ table(
         ["GET /", "CDN -> built React SPA (index.html)"],
         ["POST /api/engine/move", "FastAPI: minimax search (<= 3.5 s budget)"],
         ["POST /api/auth/* , /api/games, /api/leaderboard", "FastAPI + Turso (libSQL over HTTP)"],
+        ["POST /api/online/games/* , GET /api/online/games/{id}", "FastAPI + Turso (server-authoritative matches)"],
     ],
     [72, 100],
 )
@@ -238,9 +242,12 @@ table(
         ["backend/app/routes_auth.py", "config/register/login/google/guest/me"],
         ["backend/app/routes_games.py", "save + list finished games"],
         ["backend/app/routes_leaderboard.py", "public ranking endpoint"],
+        ["backend/app/routes_online.py", "create/join/poll/move/resign/cancel online games"],
         ["frontend/src/hooks/useChessGame.js", "All game state: moves, engine calls, pre-move queue"],
+        ["frontend/src/hooks/useOnlineGame.js", "Poll loop, resume, optimistic drop + rollback"],
         ["frontend/src/auth/AuthContext.jsx", "Session restore + auth actions"],
-        ["frontend/src/components/", "ChessGame, LoginScreen, GameHistory, Leaderboard, overlays"],
+        ["frontend/src/api/onlineClient.js", "REST client for the multiplayer endpoints"],
+        ["frontend/src/components/", "ChessGame, OnlinePlay, LoginScreen, GameHistory, Leaderboard"],
         [".harness/pipeline.yaml", "CI/CD: build -> test -> dockerize -> deploy"],
     ],
     [64, 108],
@@ -263,10 +270,20 @@ table(
         ["id TEXT PK", "id TEXT PK, user_id -> users.id"],
         ["email TEXT UNIQUE (null for guests)", "pgn TEXT, result (win/loss/draw)"],
         ["name, provider (email/google/guest)", "result_detail, player_color (w/b)"],
-        ["password_hash (bcrypt), google_sub", "difficulty, moves_count, created_at"],
+        ["password_hash (bcrypt), google_sub", "difficulty, moves_count, opponent, created_at"],
         ["created_at", "idx: (user_id, created_at DESC)"],
     ],
     [86, 86],
+)
+table(
+    ["online_games"],
+    [
+        ["id TEXT PK, code TEXT UNIQUE (6-char invite)"],
+        ["white_id -> users.id, black_id (null while waiting)"],
+        ["status (waiting/active/over/cancelled), fen, pgn, last_uci"],
+        ["winner (w/b/null), result_detail; idx: (code)"],
+    ],
+    [172],
 )
 h2("Leaderboard rules")
 for line in [
@@ -278,10 +295,50 @@ for line in [
     bullet(line)
 
 # ---------------------------------------------------------------------------
-# 5. API reference
+# 5. Online multiplayer
 # ---------------------------------------------------------------------------
 pdf.add_page()
-h1("5. API Reference")
+h1("5. Online Multiplayer (human vs human)")
+para(
+    "The Play Online tab turns the site into a real-time correspondence-style "
+    "arena: one player creates a game and gets a 6-character invite code (or a "
+    "shareable /?join=CODE link that auto-joins), the other enters it, and both "
+    "land on the same board. The creator plays White."
+)
+h2("Design: server-authoritative, polled")
+for line in [
+    "Vercel Python functions are stateless (no WebSockets), so the match lives in",
+    "Turso's online_games table and both clients poll every 2.5s, paused while the",
+    "tab is hidden - chess is turn-based, so latency is invisible in practice.",
+    "Every move is validated server-side with python-chess: the stored PGN is",
+    "replayed (so threefold repetition is tracked), the move is checked against",
+    "board.legal_moves, and only then committed - a tampered client can never",
+    "push an impossible position (illegal -> 422).",
+    "Writes use optimistic concurrency (UPDATE ... WHERE fen = <expected>): two",
+    "simultaneous writers cannot both win; the loser gets 409 and re-syncs.",
+    "Terminal states (mate, stalemate, insufficient material, repetition,",
+    "50-move) are detected on the server after every move.",
+    "Finished matches are written into games for BOTH players with",
+    "difficulty='online' - history and the leaderboard pick them up unchanged.",
+    "The frontend keeps the game id in localStorage, so a refresh resumes the",
+    "match; moves are optimistically applied locally then reconciled with the",
+    "server response (rollback = refetch).",
+]:
+    bullet(line)
+h2("What the player gets")
+for line in [
+    "Waiting room with big invite code + one-click 'Copy invite link'.",
+    "Live board (auto-flipped to your colour) with last-move highlight.",
+    "Turn indicator ('Your move' / 'Waiting for Name...' / in-check warning).",
+    "Resign button, game-over dialog with per-opponent wording, New game.",
+    "Captured pieces + move history panels reused from the engine game.",
+]:
+    bullet(line)
+
+# ---------------------------------------------------------------------------
+# 6. API reference
+# ---------------------------------------------------------------------------
+h1("6. API Reference")
 table(
     ["Method + path", "Auth", "Purpose"],
     [
@@ -297,6 +354,12 @@ table(
         ["POST /api/games", "JWT", "Store a finished game (201)"],
         ["GET /api/games", "JWT", "Own games, newest first (last 20)"],
         ["GET /api/leaderboard", "-", "Top players by points (difficulty filter)"],
+        ["POST /api/online/games", "JWT", "Create match -> invite code (201)"],
+        ["POST /api/online/games/join", "JWT", "Join by code (case-insensitive)"],
+        ["GET /api/online/games/{id}", "JWT", "Poll state (participants only)"],
+        ["POST /api/online/games/{id}/move", "JWT", "Submit move (python-chess checked)"],
+        ["POST /api/online/games/{id}/resign", "JWT", "Resign -> opponent wins"],
+        ["POST /api/online/games/{id}/cancel", "JWT", "Cancel a waiting game (creator)"],
     ],
     [58, 14, 100],
 )
@@ -307,9 +370,9 @@ para(
 )
 
 # ---------------------------------------------------------------------------
-# 6. Deployment
+# 7. Deployment
 # ---------------------------------------------------------------------------
-h1("6. Deployment and Infrastructure")
+h1("7. Deployment and Infrastructure")
 table(
     ["Piece", "Detail"],
     [
@@ -330,17 +393,20 @@ para(
 )
 
 # ---------------------------------------------------------------------------
-# 7. Testing
+# 8. Testing
 # ---------------------------------------------------------------------------
-h1("7. Testing and Quality")
+h1("8. Testing and Quality")
 table(
     ["Suite", "Count", "Covers"],
     [
-        ["backend pytest", "34", "Engine tactics (mate-in-N), API, auth, leaderboard"],
-        ["frontend vitest", "39", "Engine client, game hook (pre-moves), login, leaderboard"],
+        ["backend pytest", "43", "Engine tactics (mate-in-N), API, auth, leaderboard,"],
+        ["", "", "online multiplayer (lobby, validation, results, access)"],
+        ["frontend vitest", "53", "Engine client, game hook, login, leaderboard,"],
+        ["", "", "online hook (poll/resume/rollback) + lobby/board UI"],
         ["lint", "clean", "eslint (react + react-hooks) on all frontend source"],
-        ["build", "clean", "Production Vite bundle (~292 KB / 92 KB gzip)"],
+        ["build", "clean", "Production Vite bundle (~300 KB / 95 KB gzip)"],
         ["engine guard", "selfplay", "Easy never beats master (monotonicity check)"],
+        ["prod E2E", "REST", "Live two-player game: create/join/checkmate/history"],
     ],
     [34, 20, 118],
 )
@@ -350,13 +416,15 @@ para(
 )
 
 # ---------------------------------------------------------------------------
-# 8. Security
+# 9. Security
 # ---------------------------------------------------------------------------
-h1("8. Security Notes")
+h1("9. Security Notes")
 for line in [
     "Passwords: bcrypt with default cost; login answers a generic 401 either way.",
     "Sessions: stateless HS256 JWT (30 days) with exp; secret from SECRET_KEY env.",
     "Google: ID tokens verified server-side (JWKS, RS256, audience) - no client secret.",
+    "Online games: participant-only access (strangers get 404, existence not leaked);",
+    "all moves re-validated server-side, so the client cannot forge positions.",
     "Sensitive values (DB token, JWT secret) live only in Vercel encrypted env vars;",
     "temporary access tokens used during setup were revoked and verified dead.",
     "Leaderboard exposes display names and stats only - never emails or tokens.",
@@ -365,10 +433,10 @@ for line in [
     bullet(line)
 
 # ---------------------------------------------------------------------------
-# 9. Hard-won notes
+# 10. Hard-won notes
 # ---------------------------------------------------------------------------
 pdf.add_page()
-h1("9. Hard-won Technical Notes")
+h1("10. Hard-won Technical Notes")
 para("Details that cost real debugging time - recorded so they are never re-learned:")
 for line in [
     "Python 3.14 has no 'libsql' wheel (Rust build fails) -> pure-Python libsql-client.",
@@ -387,15 +455,18 @@ for line in [
     "level was one ply late on tactics; also never stand-pat while in check.",
     "Serverless calibration: measure depth achieved in PRODUCTION, not just locally -",
     "wall-clock budgets tuned on a fast laptop collapsed hard/master to the same depth.",
+    "Multiplayer on serverless = short polling (no sockets); replay the stored PGN for",
+    "legality (keeps repetition history) and guard writes with WHERE fen = expected.",
     "Test ergonomics: no jest-dom (plain DOM assertions), user-event for realistic",
-    "clicks/submits, and assertions must respect React act() batching.",
+    "clicks/submits, assertions must respect React act() batching, and waitFor HANGS",
+    "under vi.useFakeTimers() - flush with advanceTimersByTimeAsync inside act().",
 ]:
     bullet(line)
 
 # ---------------------------------------------------------------------------
-# 10. Timeline and roadmap
+# 11. Timeline and roadmap
 # ---------------------------------------------------------------------------
-h1("10. Timeline and Roadmap")
+h1("11. Timeline and Roadmap")
 h2("Shipped, in order")
 for line in [
     "Game + engine + tests + Harness CI/CD pipeline + Docker packaging.",
@@ -404,12 +475,16 @@ for line in [
     "Accounts: Turso database, email/Google/guest auth, JWT, auto-saved history.",
     "Production hardening: libsql URL fix, env-var scoping, whitespace tolerance.",
     "Leaderboard with points, difficulty filter and top-3 medals.",
+    "Engine strength fixes: quiescence mate detection + production-calibrated budgets.",
+    "Online multiplayer: invite codes/links, server-validated moves, polling, resume.",
 ]:
     bullet(line)
 h2("Ideas for next")
 for line in [
+    "NNUE evaluator: train a small network on self-play positions to replace the",
+    "hand-written evaluation; ship behind a flag until tactics + self-play prove it.",
     "Complete Google sign-in (create OAuth client ID, set GOOGLE_CLIENT_ID).",
-    "Sound effects and mobile polish; per-game move analysis from the engine.",
+    "Clocks and draw offers for online games; sound effects; mobile polish.",
     "Seasonal leaderboards, rating changes per game (Elo from the games table).",
 ]:
     bullet(line)

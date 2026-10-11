@@ -74,7 +74,33 @@ GET  /api/auth/me        -> current user (Bearer token)
 POST /api/games          -> {pgn, result, player_color, ...} -> saved game (201)
 GET  /api/games          -> the signed-in user's last 20 games
 GET  /api/leaderboard    -> top players by points (win=1, draw=0.5); ?difficulty=&limit=
+
+POST /api/online/games           create a match -> {code, ...} (you are White, 201)
+POST /api/online/games/join      {code} -> join as Black (code is case-insensitive)
+GET  /api/online/games/{id}      poll full state (participants only; strangers get 404)
+POST /api/online/games/{id}/move {from, to, promotion?} -> validated by python-chess
+POST /api/online/games/{id}/resign   lose on purpose (opponent wins)
+POST /api/online/games/{id}/cancel   abort a waiting game (creator only)
 ```
+
+## Online multiplayer (human vs human)
+
+The "Play Online" tab lets two signed-in players play each other in real
+time — no refresh needed:
+
+* **Invite codes** — create a game to get a 6-character code (or a shareable
+  `/?join=CODE` link that auto-joins), your friend enters it and you both land
+  on the same board. Creator plays White.
+* **Server-authoritative** — every move is validated server-side with
+  python-chess (illegal moves are rejected with 422; stale writes lose a race
+  with 409), so a tampered client cannot push an impossible position.
+* **Short polling** — the frontend polls the game every 2.5s (paused while the
+  tab is hidden) because Vercel's Python functions are stateless: no sockets,
+  the game simply lives in Turso's `online_games` table.
+* **Results count everywhere** — finished online games are written for *both*
+  players into the history panel and the leaderboard (filter "online").
+* **Resume** — your active game id is stored locally, so a refresh drops you
+  back into the match. Auto-queen keeps move entry fast; Resign ends it early.
 
 ## Accounts & game history (Turso)
 

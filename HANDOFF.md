@@ -5,9 +5,10 @@
 
 ## What this is
 
-Player-vs-Computer chess: React 18 + Vite frontend, FastAPI backend with a
-custom minimax/alpha-beta engine, accounts + game history on **Turso**
-(libSQL), Harness CI/CD, auto-deploy to Vercel.
+Chess vs. computer (React 18 + Vite frontend, FastAPI backend with a custom
+minimax/alpha-beta engine) **plus online human-vs-human multiplayer**;
+accounts + game history on **Turso** (libSQL), Harness CI/CD, auto-deploy to
+Vercel.
 
 - **Live:** https://chess-vs-computer-five.vercel.app
 - **Repo:** https://github.com/HarshitAgrawaliitrpr/chess-vs-computer (public, branch `main`)
@@ -25,19 +26,28 @@ custom minimax/alpha-beta engine, accounts + game history on **Turso**
 - [x] Leaderboard: top players by points (win=1, draw=0.5), difficulty filter,
       top-3 medals; public endpoint `GET /api/leaderboard`, refreshes on
       `game-saved` like the history panel
-- [x] Tests: 34 backend (pytest) + 39 frontend (vitest) — all green
+- [x] **Online multiplayer** (2026-10-11): invite codes + `/?join=CODE` links,
+      server-authoritative moves (python-chess validated), 2.5s short polling
+      (paused when tab hidden), auto-queen, resign/cancel, refresh-resume via
+      localStorage; results written for BOTH players into history + leaderboard
+      (`difficulty='online'`); prod E2E verified live
+- [x] Tests: 43 backend (pytest) + 53 frontend (vitest) — all green
 - [ ] Optional: Google button (needs GOOGLE_CLIENT_ID env var in Vercel; see README)
+- [ ] Next: **NNUE evaluator** (user asked for it right after multiplayer)
 - [x] Security: all temporary tokens (Vercel, Turso CLI-less flow) revoked/verified dead
 
 ## Where things live
 
 - Backend app: `backend/app/` — `main.py` (engine routes + router wiring +
   static mount), `db.py` (libsql-client layer), `store.py` (schema + repo +
-  leaderboard aggregate), `security.py` (bcrypt/JWT/Google), `routes_auth.py`,
-  `routes_games.py`, `routes_leaderboard.py`
+  leaderboard + `online_games`), `security.py` (bcrypt/JWT/Google),
+  `routes_auth.py`, `routes_games.py`, `routes_leaderboard.py`,
+  `routes_online.py` (create/join/poll/move/resign/cancel)
 - Frontend: `frontend/src/` — `auth/AuthContext.jsx`, `api/authClient.js`,
-  `components/LoginScreen.jsx`, `components/GameHistory.jsx`,
-  `hooks/useChessGame.js` (all game + pre-move logic)
+  `api/onlineClient.js`, `components/LoginScreen.jsx`,
+  `components/GameHistory.jsx`, `components/OnlinePlay.jsx` (lobby/waiting/board),
+  `hooks/useChessGame.js` (engine game + pre-move),
+  `hooks/useOnlineGame.js` (poll loop, resume, optimistic drop + rollback)
 - Tests: `backend/tests/` (incl. `conftest.py` — isolated temp DB per session),
   `frontend/src/__tests__/`
 - Vercel env vars (set in dashboard, scopes Production+Preview):
@@ -60,7 +70,8 @@ custom minimax/alpha-beta engine, accounts + game history on **Turso**
    After changing env vars you must Redeploy (or push) — they don't hot-reload.
 5. react-chessboard v4: board highlights prop is `customSquareStyles`;
    `onPieceDrop(source, target)` returns false to keep pieces in place (pre-move).
-6. Frontend tests: no jest-dom — use plain DOM assertions; `@testing-library/user-event`
+6. Frontend tests: no jest-dom — use plain DOM assertions (`.disabled`, not
+   `toBeDisabled()`; `.textContent`, not `toHaveTextContent()`); `@testing-library/user-event`
    is installed for realistic form/click simulation; act() gotchas in hook tests
    (assert after act, waitFor sees final state with instant fake engines).
 7. `backend/pytest.ini` has `addopts = -q` — running `pytest -q` again suppresses
@@ -80,19 +91,31 @@ custom minimax/alpha-beta engine, accounts + game history on **Turso**
     profile was a ply late on tactics. `_quiescence` now returns
     `-MATE_SCORE + ply` for no-evasion positions and never stand-pats while
     in check.
+11. **`waitFor` hangs under `vi.useFakeTimers()`** — it polls a `setTimeout`
+    that fake timers swallowed (test times out at 5s). With fake timers, flush
+    with `await vi.advanceTimersByTimeAsync(ms)` inside `act()` (it awaits the
+    timer callback's microtasks too) and assert synchronously afterwards.
+12. **Multiplayer on serverless = short polling, not sockets.** Vercel Python
+    functions are stateless; the online game lives in Turso and both clients
+    poll `GET .../{id}` every 2.5s (paused on hidden tab). Moves are validated
+    server-side by replaying the stored PGN (so threefold repetition works)
+    and committed with `WHERE fen = <expected>` so two simultaneous writers
+    can't both win the race (loser gets 409).
 
 ## Dev commands
 
 ```bash
-cd backend  && python -m pytest          # 30 tests
-cd frontend && npx vitest run            # 35 tests
+cd backend  && python -m pytest          # 43 tests
+cd frontend && npx vitest run            # 53 tests
 cd frontend && npx eslint src            # lint
 cd frontend && npm run build             # production bundle
 cd backend  && uvicorn app.main:app --reload --port 8000
 ```
 
-## Ideas queued (user hasn't picked yet)
+## Ideas queued
 
-Leaderboard/ratings — DONE (2026-10-11, see above); remaining ideas: sound
-effects, mobile polish, Google login completion, move annotations for the
-engine (why did it play that).
+Multiplayer + leaderboard — DONE (2026-10-11). Next up per user: **NNUE
+evaluator** (train a small net in numpy to replace/augment the hand-written
+eval; needs self-play data + eval flag + tactics validation before flipping).
+Other ideas: sound effects, mobile polish, Google login completion, move
+annotations for the engine (why did it play that).
