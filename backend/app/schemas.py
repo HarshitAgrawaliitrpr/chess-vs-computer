@@ -68,6 +68,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    eval_backend: str  # "hand" or "nnue" — which evaluator search uses
 
 
 # ---------------------------------------------------------------------------

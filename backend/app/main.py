@@ -92,7 +92,12 @@ def _to_move_info(board_before: chess.Board, move: chess.Move) -> MoveInfo:
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", service="chess-engine-api", version=VERSION)
+    from .engine import nnue
+
+    backend = "nnue" if nnue.get_active() is not None else "hand"
+    return HealthResponse(
+        status="ok", service="chess-engine-api", version=VERSION, eval_backend=backend
+    )
 
 
 @app.get("/api/difficulties")

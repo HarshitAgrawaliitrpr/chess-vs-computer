@@ -18,6 +18,8 @@ def test_health() -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["service"] == "chess-engine-api"
+    # tests never set EVAL_BACKEND, so the hand evaluator must be active
+    assert body["eval_backend"] == "hand"
 
 
 def test_difficulties_are_exposed() -> None:
