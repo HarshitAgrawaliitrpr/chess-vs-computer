@@ -13,6 +13,8 @@ venv/
 
 # Env / IDE
 .env
+.jwt-secret
+*.db
 .idea/
 .vscode/
 *.swp

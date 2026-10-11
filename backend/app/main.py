@@ -4,6 +4,14 @@ Endpoints
 --------
 GET  /api/health          liveness probe used by the Docker/CI pipeline
 POST /api/engine/move     compute the best move for the side to move in a FEN
+GET  /api/auth/config     whether Google sign-in is configured (+ client id)
+POST /api/auth/register   create an email/password account
+POST /api/auth/login      email/password sign-in
+POST /api/auth/google     sign in with a Google Identity Services ID token
+POST /api/auth/guest      anonymous play (still gets history + a JWT)
+GET  /api/auth/me         the authenticated user
+POST /api/games           store a finished game
+GET  /api/games           the authenticated user's recent games
 """
 
 from __future__ import annotations
@@ -17,6 +25,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .engine.search import MATE_THRESHOLD, Searcher
 from .engine.strengths import PROFILES, resolve_profile
+from .routes_auth import router as auth_router
+from .routes_games import router as games_router
 from .schemas import (
     GameOverModel,
     HealthResponse,
@@ -136,6 +146,15 @@ def engine_move(request: MoveRequest) -> SearchResultModel:
         difficulty=profile.name,
         elo_estimate=profile.elo,
     )
+
+
+# ---------------------------------------------------------------------------
+# Accounts + game history (Turso/libSQL). Registered before the static mount
+# so `/api/*` always wins; if the database is unconfigured only these routes
+# degrade to 503 - the engine keeps serving.
+# ---------------------------------------------------------------------------
+app.include_router(auth_router)
+app.include_router(games_router)
 
 
 # ---------------------------------------------------------------------------

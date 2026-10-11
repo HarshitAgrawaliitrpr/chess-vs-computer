@@ -320,3 +320,84 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .result-overlay, .result { animation: none; }
 }
+
+/* ---------------------------------------------------------------------------
+ * Accounts: login gate, user chip, game history
+ * ------------------------------------------------------------------------- */
+
+.app__loading { text-align: center; color: var(--muted); padding: 60px 0; font-size: 1.05rem; }
+
+.app__header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.app__user { display: flex; align-items: center; gap: 8px; }
+.app__user-name { font-weight: 600; }
+.app__user-badge {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+  padding: 2px 8px; border-radius: 999px; background: var(--panel-2);
+  border: 1px solid var(--border); color: var(--muted);
+}
+.app__user-badge--google { color: var(--info); }
+.app__user-badge--email { color: var(--accent); }
+.app__logout {
+  padding: 6px 12px; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+}
+.app__logout:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Login gate */
+.login { display: flex; justify-content: center; padding: 40px 0; }
+.login__card {
+  width: 100%; max-width: 380px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 12px; padding: 28px 26px;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
+}
+.login__title { margin: 0; font-size: 1.5rem; text-align: center; }
+.login__subtitle { margin: 0; color: var(--muted); text-align: center; font-size: 0.92rem; }
+.login__note { margin: 0; color: var(--muted); font-size: 0.8rem; text-align: center; font-style: italic; }
+.login__oauth { display: flex; justify-content: center; min-height: 44px; }
+.login__divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.8rem; }
+.login__divider::before, .login__divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.login__form { display: flex; flex-direction: column; gap: 10px; }
+.login__field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+.login__field input {
+  padding: 10px 12px; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;
+}
+.login__field input:focus { outline: none; border-color: var(--accent); }
+.login__error { margin: 0; color: var(--danger); font-size: 0.85rem; }
+.login__submit, .login__guest {
+  padding: 11px 12px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; border: 1px solid transparent;
+}
+.login__submit { background: var(--accent); color: #14210a; font-weight: 700; }
+.login__submit:hover:not(:disabled) { background: var(--accent-2); color: var(--text); }
+.login__guest { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+.login__guest:hover:not(:disabled) { border-color: var(--accent); }
+.login__submit:disabled, .login__guest:disabled, .login__switch:disabled { opacity: 0.55; cursor: not-allowed; }
+.login__switch { background: none; border: none; color: var(--info); cursor: pointer; font-size: 0.85rem; }
+.login__switch:hover:not(:disabled) { text-decoration: underline; }
+.login__credit { margin: 4px 0 0; text-align: center; color: var(--accent); font-weight: 700; letter-spacing: 1.5px; font-size: 0.7rem; text-transform: uppercase; }
+
+/* Game history */
+.history { margin-top: 22px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.history__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.history__head h2 { margin: 0; font-size: 1.1rem; }
+.history__refresh {
+  padding: 5px 12px; background: var(--panel-2); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+}
+.history__refresh:hover { color: var(--text); border-color: var(--accent); }
+.history__empty { color: var(--muted); font-size: 0.9rem; margin: 6px 0; }
+.history__error { color: var(--danger); font-size: 0.85rem; margin: 6px 0; }
+.history__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.history__row {
+  display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; font-size: 0.88rem;
+}
+.history__badge { font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.history__badge--win { color: var(--accent); }
+.history__badge--loss { color: var(--danger); }
+.history__badge--draw { color: var(--info); }
+.history__meta { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history__date { color: var(--muted); font-size: 0.8rem; }

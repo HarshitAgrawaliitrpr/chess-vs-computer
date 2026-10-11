@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import StatusBar from "./StatusBar.jsx";
 import MoveHistory from "./MoveHistory.jsx";
@@ -7,15 +7,43 @@ import DifficultySelector from "./DifficultySelector.jsx";
 import EngineStats from "./EngineStats.jsx";
 import GameOverOverlay from "./GameOverOverlay.jsx";
 import { useChessGame } from "../hooks/useChessGame.js";
+import { authApi } from "../api/authClient.js";
+import { useAuth } from "../auth/AuthContext.jsx";
 
 export default function ChessGame() {
   const game = useChessGame();
+  const { user } = useAuth();
   const [resultDismissed, setResultDismissed] = useState(false);
+  const savedRef = useRef(false);
 
   // A fresh game (or a color switch) always brings the dialog back next time.
   useEffect(() => {
     if (!game.status.over) setResultDismissed(false);
   }, [game.status.over]);
+
+  // Auto-save every finished game (win, loss or draw) for the signed-in user;
+  // the ref guards against double-saves, and GameHistory listens for the event.
+  useEffect(() => {
+    if (!game.status.over || !game.result) {
+      savedRef.current = false;
+      return;
+    }
+    if (savedRef.current || !user) return;
+    savedRef.current = true;
+    authApi
+      .saveGame({
+        pgn: game.pgn,
+        result: game.result,
+        result_detail: game.status.kind,
+        player_color: game.playerColor,
+        difficulty: game.difficulty,
+        moves_count: game.moves.length,
+      })
+      .then(() => window.dispatchEvent(new CustomEvent("game-saved")))
+      .catch(() => {
+        savedRef.current = false; // let a later effect run retry quietly
+      });
+  }, [game.status.over, game.status.kind, game.result, game.pgn, game.playerColor, game.difficulty, game.moves.length, user]);
 
   return (
     <div className="game">

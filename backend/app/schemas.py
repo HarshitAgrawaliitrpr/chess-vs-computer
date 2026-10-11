@@ -68,3 +68,70 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+
+
+# ---------------------------------------------------------------------------
+# Accounts + game history (Turso/libSQL backed)
+# ---------------------------------------------------------------------------
+
+AuthProvider = Literal["email", "google", "guest"]
+GameOutcome = Literal["win", "loss", "draw"]
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=254, description="Email address (unique).")
+    name: str = Field(..., min_length=1, max_length=60, description="Display name.")
+    password: str = Field(..., min_length=8, max_length=128, description="At least 8 characters.")
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=254)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(..., min_length=10, max_length=8192, description="GIS ID token.")
+
+
+class GuestLoginRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=40, description="Optional guest display name.")
+
+
+class UserOut(BaseModel):
+    id: str
+    email: Optional[str] = None
+    name: str
+    provider: AuthProvider
+    created_at: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserOut
+
+
+class AuthConfig(BaseModel):
+    """Frontend bootstrap: is Google sign-in available, and with which client id?"""
+
+    google_enabled: bool
+    google_client_id: Optional[str] = None
+
+
+class GameCreate(BaseModel):
+    pgn: str = Field(..., min_length=1, max_length=20000)
+    result: GameOutcome
+    result_detail: Optional[str] = Field(None, max_length=60)
+    player_color: Literal["w", "b"]
+    difficulty: str = Field(..., min_length=1, max_length=20)
+    moves_count: int = Field(0, ge=0, le=500)
+
+
+class GameOut(BaseModel):
+    id: str
+    pgn: str
+    result: GameOutcome
+    result_detail: Optional[str] = None
+    player_color: Literal["w", "b"]
+    difficulty: str
+    moves_count: int
+    created_at: str
