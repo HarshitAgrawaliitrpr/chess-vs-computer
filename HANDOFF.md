@@ -103,9 +103,15 @@ Vercel.
    serverless CPU runs ~4x slower than this laptop; budgets tuned locally made
    `hard` and `master` both abort at depth 4 in production (identical play
    behind 1650 vs 2000 Elo — the "difficulty not increasing" incident).
-   Current budgets (strengths.py): 150/1000/2500/8000 ms → prod depths
-   1/3/4/5, local 1/3/5/6-7. Proven: function timeout > 10 s (a 10002 ms
-   search returned), so master's 8 s budget + cold start fits.
+   Functions run in **bom1 (Mumbai)** since 2026-10-12 (`vercel.json`
+   `regions`) — next to the Turso DB (ap-south-1) and the players: fixed
+   per-call overhead dropped ~410 ms → ~115 ms, leaderboard 1124 → 380 ms.
+   Budgets now 100/400/1800/8000 ms with master capped at depth 6 (a depth-7
+   cap burned the FULL 8 s attempting depth 7 then returning depth 6 anyway;
+   cap 6 stops at ~3-5.5 s typical). Prod depths 1/3/5/6, search times
+   5 ms/103 ms/~1 s/~3 s (dense middlegame). easy/medium/hard finish by
+   DEPTH cap, not budget — budgets are safety nets only. Proven: function
+   timeout > 8 s budget + cold start fits.
 10. **Quiescence must value checkmate**: a mated position on the horizon used
     to score as a ~500 cp static eval, so easy NEVER saw a mate and every
     profile was a ply late on tactics. `_quiescence` now returns
