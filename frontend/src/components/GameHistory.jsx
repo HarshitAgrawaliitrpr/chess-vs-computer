@@ -57,7 +57,7 @@ export default function GameHistory() {
                 {RESULT_LABEL[game.result] ?? game.result}
               </span>
               <span className="history__meta">
-                {game.player_color === "w" ? "White" : "Black"} vs computer &middot;{" "}
+                {game.player_color === "w" ? "White" : "Black"} vs {game.opponent || "computer"} &middot;{" "}
                 {game.difficulty} &middot; {game.moves_count} moves
                 {game.result_detail ? ` · ${game.result_detail.replace(/_/g, " ")}` : ""}
               </span>

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { authApi } from "../api/authClient.js";
 
-const DIFFICULTIES = ["all", "easy", "medium", "hard", "master"];
+const DIFFICULTIES = ["all", "easy", "medium", "hard", "master", "online"];
 const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"]; // gold, silver, bronze
 
 export default function Leaderboard() {

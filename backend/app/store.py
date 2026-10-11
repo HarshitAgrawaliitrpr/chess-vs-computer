@@ -375,12 +375,19 @@ def update_online_position(
     status: str,
     winner: Optional[str],
     result_detail: Optional[str],
-) -> None:
+    expected_fen: Optional[str] = None,
+) -> int:
+    """Apply a new position; returns rows updated (0 = stale read lost the race)."""
     ensure_ready()
-    db.execute(
+    where = "id = ?"
+    params: List[Any] = [fen, pgn, last_uci, status, winner, result_detail, utc_now(), game_id]
+    if expected_fen is not None:
+        where += " AND fen = ?"
+        params.append(expected_fen)
+    return db.execute(
         "UPDATE online_games SET fen = ?, pgn = ?, last_uci = ?, status = ?, winner = ?, "
-        "result_detail = ?, updated_at = ? WHERE id = ?",
-        (fen, pgn, last_uci, status, winner, result_detail, utc_now(), game_id),
+        f"result_detail = ?, updated_at = ? WHERE {where}",
+        tuple(params),
     )
 
 

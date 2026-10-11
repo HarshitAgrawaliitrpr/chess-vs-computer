@@ -135,6 +135,7 @@ class GameOut(BaseModel):
     difficulty: str
     moves_count: int
     created_at: str
+    opponent: Optional[str] = Field(None, description="Opponent name (online games).")
 
 
 class LeaderboardEntry(BaseModel):

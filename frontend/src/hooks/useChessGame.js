@@ -32,7 +32,7 @@ function describeStatus(game) {
 }
 
 /** Split the SAN history into `{capturedByWhite, capturedByBlack}` piece codes. */
-function summarizeCaptures(verboseHistory) {
+export function summarizeCaptures(verboseHistory) {
   const capturedByWhite = [];
   const capturedByBlack = [];
   for (const move of verboseHistory) {

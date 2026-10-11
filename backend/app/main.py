@@ -13,6 +13,8 @@ GET  /api/auth/me         the authenticated user
 POST /api/games           store a finished game
 GET  /api/games           the authenticated user's recent games
 GET  /api/leaderboard     top players by points (optional ?difficulty=)
+POST /api/online/games    create/join/move/resign/cancel online matches
+GET  /api/online/games/{id}  poll a match you are playing in
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from .engine.strengths import PROFILES, resolve_profile
 from .routes_auth import router as auth_router
 from .routes_games import router as games_router
 from .routes_leaderboard import router as leaderboard_router
+from .routes_online import router as online_router
 from .schemas import (
     GameOverModel,
     HealthResponse,
@@ -158,6 +161,7 @@ def engine_move(request: MoveRequest) -> SearchResultModel:
 app.include_router(auth_router)
 app.include_router(games_router)
 app.include_router(leaderboard_router)
+app.include_router(online_router)
 
 
 # ---------------------------------------------------------------------------

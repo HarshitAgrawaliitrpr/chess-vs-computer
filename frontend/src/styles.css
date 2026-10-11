@@ -437,3 +437,71 @@ body {
   .leaderboard__row { grid-template-columns: 32px 1fr auto; }
   .leaderboard__games, .leaderboard__record { display: none; }
 }
+
+/* Game mode tabs (vs Computer / Play Online) */
+.tabs { display: flex; gap: 6px; margin: 18px 0 6px; }
+.tabs__tab {
+  flex: 0 0 auto; padding: 9px 18px; font-size: 0.95rem; font-weight: 600;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--border); border-bottom: none;
+  border-radius: 10px 10px 0 0; cursor: pointer;
+}
+.tabs__tab:hover { color: var(--text); }
+.tabs__tab--active { background: var(--panel-2); color: var(--accent); border-color: var(--accent); }
+
+/* Online lobby + waiting room */
+.lobby { display: flex; justify-content: center; padding: 8px 0 4px; }
+.lobby__card {
+  width: min(560px, 100%); background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 22px 26px; text-align: center;
+}
+.lobby__card h2 { margin: 0 0 8px; }
+.lobby__card p { color: var(--muted); font-size: 0.92rem; line-height: 1.55; }
+.lobby__primary {
+  margin-top: 10px; padding: 11px 26px; font-size: 1rem; font-weight: 700;
+  background: var(--accent); color: #171a12; border: none; border-radius: 10px; cursor: pointer;
+}
+.lobby__primary:hover:enabled { filter: brightness(1.06); }
+.lobby__primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.lobby__divider {
+  display: flex; align-items: center; gap: 12px; margin: 20px 0 14px;
+  color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;
+}
+.lobby__divider::before, .lobby__divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.lobby__join { display: flex; gap: 8px; justify-content: center; }
+.lobby__join input {
+  width: 170px; padding: 10px 12px; text-align: center; text-transform: uppercase;
+  letter-spacing: 3px; font-size: 1rem; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.lobby__join button {
+  padding: 10px 22px; font-weight: 700; background: var(--accent-2); color: #171a12;
+  border: none; border-radius: 10px; cursor: pointer;
+}
+.lobby__join button:disabled { opacity: 0.5; cursor: not-allowed; }
+.lobby__error { color: var(--danger); font-size: 0.88rem; margin-top: 12px; }
+.lobby__card--waiting .lobby__code {
+  font-size: 2.4rem; font-weight: 800; letter-spacing: 10px; color: var(--accent);
+  margin: 14px 0 6px; user-select: all;
+}
+.lobby__actions { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+.lobby__actions .lobby__primary { margin-top: 0; }
+.lobby__actions button:not(.lobby__primary) {
+  padding: 11px 20px; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+}
+.lobby__hint { font-size: 0.82rem; margin-top: 14px; }
+
+/* Online in-game status line */
+.online__status {
+  display: flex; flex-direction: column; gap: 3px; align-items: center;
+  margin-top: 10px; padding: 9px 14px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--border); text-align: center;
+}
+.online__status--yourturn { border-color: var(--accent); }
+.online__title { font-weight: 700; font-size: 0.95rem; }
+.online__turn { color: var(--muted); font-size: 0.85rem; }
+.online__turn--over { color: var(--accent-2); font-weight: 700; }
+.online__error { color: var(--danger); font-size: 0.82rem; }
+.online__invite { color: var(--muted); font-size: 0.82rem; letter-spacing: 1px; }
+.online__new { background: var(--accent); color: #171a12; font-weight: 700; border: none; }

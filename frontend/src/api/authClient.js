@@ -47,7 +47,7 @@ function messageFrom(data, status) {
   return `Request failed (${status})`;
 }
 
-async function request(path, { method = "GET", body } = {}) {
+export async function request(path, { method = "GET", body } = {}) {
   const headers = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const token = getToken();

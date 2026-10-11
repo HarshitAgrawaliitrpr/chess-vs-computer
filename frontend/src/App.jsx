@@ -1,11 +1,33 @@
+import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import ChessGame from "./components/ChessGame.jsx";
 import GameHistory from "./components/GameHistory.jsx";
 import Leaderboard from "./components/Leaderboard.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
+import OnlinePlay from "./components/OnlinePlay.jsx";
 
 function Shell() {
   const { user, loading, logout } = useAuth();
+  const [tab, setTab] = useState("engine");
+  const [joinCode, setJoinCode] = useState("");
+
+  // Invite link support: /?join=CODE switches to the online tab and starts
+  // the join; the parameter is stripped from the URL immediately so a
+  // refresh does not re-trigger it.
+  useEffect(() => {
+    try {
+      const code = new URLSearchParams(window.location.search).get("join");
+      if (code) {
+        setJoinCode(code.toUpperCase());
+        setTab("online");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("join");
+        window.history.replaceState({}, "", url);
+      }
+    } catch {
+      /* no URL API (tests) - ignore */
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -36,7 +58,33 @@ function Shell() {
           alpha&#8209;beta pruning (FastAPI)
         </p>
       </header>
-      <ChessGame />
+
+      <nav className="tabs" role="tablist" aria-label="Game mode">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "engine"}
+          className={`tabs__tab ${tab === "engine" ? "tabs__tab--active" : ""}`}
+          onClick={() => setTab("engine")}
+        >
+          vs Computer
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "online"}
+          className={`tabs__tab ${tab === "online" ? "tabs__tab--active" : ""}`}
+          onClick={() => setTab("online")}
+        >
+          Play Online
+        </button>
+      </nav>
+
+      {tab === "engine" ? (
+        <ChessGame />
+      ) : (
+        <OnlinePlay autoJoinCode={joinCode} onJoinConsumed={() => setJoinCode("")} />
+      )}
       <GameHistory />
       <Leaderboard />
       <footer className="app__footer">

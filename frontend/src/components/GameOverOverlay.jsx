@@ -30,7 +30,7 @@ const MESSAGES = {
   },
 };
 
-export default function GameOverOverlay({ outcome, playerColor, onRetry, onDismiss }) {
+export default function GameOverOverlay({ outcome, playerColor, onRetry, onDismiss, text }) {
   const message = MESSAGES[outcome] ?? MESSAGES.draw;
   const colorName = playerColor === "b" ? "Black" : "White";
 
@@ -48,7 +48,7 @@ export default function GameOverOverlay({ outcome, playerColor, onRetry, onDismi
         <h2 className="result__title" id="result-title">
           {message.title}
         </h2>
-        <p className="result__text">{message.text}</p>
+        <p className="result__text">{text ?? message.text}</p>
         <p className="result__meta">You played {colorName}.</p>
         <div className="result__actions">
           <button type="button" className="result__retry" onClick={onRetry} autoFocus>
