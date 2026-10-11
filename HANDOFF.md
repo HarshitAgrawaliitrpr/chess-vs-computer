@@ -68,6 +68,18 @@ custom minimax/alpha-beta engine, accounts + game history on **Turso**
 8. This machine: Windows, miniconda py3.14, Node 24, **no Docker CLI**, **no
    browser tooling**, Vercel CLI present but fine-grained tokens can't use
    `whoami`/project settings (use REST API with `?teamId=` instead).
+9. **Measure engine strength in PRODUCTION, not just locally.** Vercel's
+   serverless CPU runs ~4x slower than this laptop; budgets tuned locally made
+   `hard` and `master` both abort at depth 4 in production (identical play
+   behind 1650 vs 2000 Elo — the "difficulty not increasing" incident).
+   Current budgets (strengths.py): 150/1000/2500/8000 ms → prod depths
+   1/3/4/5, local 1/3/5/6-7. Proven: function timeout > 10 s (a 10002 ms
+   search returned), so master's 8 s budget + cold start fits.
+10. **Quiescence must value checkmate**: a mated position on the horizon used
+    to score as a ~500 cp static eval, so easy NEVER saw a mate and every
+    profile was a ply late on tactics. `_quiescence` now returns
+    `-MATE_SCORE + ply` for no-evasion positions and never stand-pats while
+    in check.
 
 ## Dev commands
 
