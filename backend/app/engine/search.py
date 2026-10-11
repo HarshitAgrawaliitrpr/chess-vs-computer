@@ -14,6 +14,10 @@ Optimisations implemented so the engine stays inside strict time limits:
   * check extensions     - forcing lines are searched one ply deeper
   * delta pruning        - clearly losing captures are skipped in the
     quiescence search
+  * pluggable evaluator  - the hand-written eval, or (EVAL_BACKEND=nnue) a
+    trained network whose hidden activations are updated INCREMENTALLY along
+    the search path (see engine/nnue.py); _push/_pop/_evaluate keep the
+    accumulator stack in lockstep with board.push/pop.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from typing import Optional
 
 import chess
 
+from . import nnue
 from .evaluation import PIECE_VALUE, evaluate_for_turn
 
 INF = 10**9
@@ -93,6 +98,9 @@ class Searcher:
         self._prev_root_scores: dict[chess.Move, int] = {}
         self._start = 0.0
         self._deadline = 0.0
+        # NNUE (optional): net + accumulator stack mirroring the push stack.
+        self._nnue = nnue.get_active()
+        self._acc_stack: list = []
 
     # ------------------------------------------------------------------ #
     # public entry point
@@ -107,6 +115,8 @@ class Searcher:
         self.nodes = 0
         self._start = time.perf_counter()
         self._deadline = self._start + self.time_limit_ms / 1000.0
+        if self._nnue is not None:
+            self._acc_stack = [self._nnue.initial(board)]
 
         best_score = -INF
         best_move: Optional[chess.Move] = legal[0]
@@ -141,6 +151,24 @@ class Searcher:
         )
 
     # ------------------------------------------------------------------ #
+    # board + evaluator plumbing (keeps the NNUE accumulator in lockstep)
+    # ------------------------------------------------------------------ #
+    def _push(self, board: chess.Board, move: chess.Move) -> None:
+        if self._nnue is not None:
+            self._acc_stack.append(self._nnue.push(board, move, self._acc_stack[-1]))
+        board.push(move)
+
+    def _pop(self, board: chess.Board) -> None:
+        board.pop()
+        if self._nnue is not None:
+            self._acc_stack.pop()
+
+    def _evaluate(self, board: chess.Board) -> int:
+        if self._nnue is not None:
+            return self._nnue.evaluate(self._acc_stack[-1], board.turn)
+        return evaluate_for_turn(board)
+
+    # ------------------------------------------------------------------ #
     # root: full window, collects every root move score (for noise + PV)
     # ------------------------------------------------------------------ #
     def _search_root(self, board: chess.Board, depth: int) -> list[tuple[chess.Move, int]]:
@@ -158,11 +186,11 @@ class Searcher:
         best = -INF
 
         for move in moves:
-            board.push(move)
+            self._push(board, move)
             try:
                 score = -self._negamax(board, depth - 1, -beta, -alpha, 1, is_null=False)
             finally:
-                board.pop()
+                self._pop(board)
             scores.append((move, score))
             if score > best:
                 best = score
@@ -204,7 +232,7 @@ class Searcher:
         self.nodes += 1
 
         if ply >= MAX_PLY:
-            return evaluate_for_turn(board)
+            return self._evaluate(board)
 
         # Draw detection (repetition / 50-move / insufficient material).
         if board.is_repetition() or board.halfmove_clock >= 100 or board.is_insufficient_material():
@@ -252,13 +280,13 @@ class Searcher:
             and self._has_non_pawn_material(board, board.turn)
         ):
             reduction = 2 + (1 if depth >= 6 else 0)
-            board.push(chess.Move.null())
+            self._push(board, chess.Move.null())
             try:
                 score = -self._negamax(
                     board, depth - 1 - reduction, -beta, -beta + 1, ply + 1, is_null=True
                 )
             finally:
-                board.pop()
+                self._pop(board)
             if score >= beta:
                 return beta
 
@@ -271,11 +299,11 @@ class Searcher:
         child_depth = depth - 1
 
         for move in ordered:
-            board.push(move)
+            self._push(board, move)
             try:
                 score = -self._negamax(board, child_depth, -beta, -alpha, ply + 1, is_null=False)
             finally:
-                board.pop()
+                self._pop(board)
 
             if score > best_score:
                 best_score = score
@@ -329,10 +357,10 @@ class Searcher:
             if not moves:
                 return -MATE_SCORE + ply
             if ply >= MAX_QUIESCENCE_PLY:
-                return evaluate_for_turn(board)  # bounded at the ply limit
+                return self._evaluate(board)  # bounded at the ply limit
             stand_pat: Optional[int] = None
         else:
-            stand_pat = evaluate_for_turn(board)
+            stand_pat = self._evaluate(board)
             if stand_pat >= beta:
                 return stand_pat
             if stand_pat > alpha:
@@ -356,11 +384,11 @@ class Searcher:
                 if victim is not None:
                     if stand_pat + PIECE_VALUE[victim] + 200 < alpha:
                         continue
-            board.push(move)
+            self._push(board, move)
             try:
                 score = -self._quiescence(board, -beta, -alpha, ply + 1)
             finally:
-                board.pop()
+                self._pop(board)
             if score > best:
                 best = score
             if score > alpha:
