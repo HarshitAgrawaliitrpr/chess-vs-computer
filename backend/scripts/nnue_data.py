@@ -36,7 +36,7 @@ TEACHER = {"max_depth": 3, "time_limit_ms": 400, "noise_cp": 14}
 MAX_OPENING_PLIES = 6  # random dither before engine play starts
 
 
-def play_game(seed: int) -> list[dict]:
+def play_game(seed: int, time_ms: int) -> list[dict]:
     rng = random.Random(seed)
     board = chess.Board()
     for _ in range(rng.randint(0, MAX_OPENING_PLIES)):
@@ -49,7 +49,11 @@ def play_game(seed: int) -> list[dict]:
     for _ply in range(MAX_PLIES):
         if board.is_game_over():
             break
-        searcher = Searcher(board, seed=rng.randrange(10**9), **TEACHER)
+        searcher = Searcher(
+            board, seed=rng.randrange(10**9), time_limit_ms=time_ms, **{
+                k: v for k, v in TEACHER.items() if k != "time_limit_ms"
+            },
+        )
         result = searcher.search()
         if result.move is None:
             break
@@ -61,14 +65,14 @@ def play_game(seed: int) -> list[dict]:
     return rows
 
 
-def worker(args: tuple[int, int, str]) -> tuple[str, int, int, float]:
-    index, games, out_dir = args
+def worker(args: tuple[int, int, str, int, int]) -> tuple[str, int, int, float]:
+    index, games, out_dir, time_ms, seed_base = args
     path = os.path.join(out_dir, f"shard-{index:03d}.jsonl")
     started = time.time()
     written = 0
     with open(path, "w", encoding="utf-8") as fh:
         for g in range(games):
-            for row in play_game(seed=index * 10**6 + g):
+            for row in play_game(seed=seed_base + index * 10**6 + g, time_ms=time_ms):
                 fh.write(json.dumps(row) + "\n")
                 written += 1
     return path, games, written, time.time() - started
@@ -79,11 +83,13 @@ def main() -> None:
     parser.add_argument("--games", type=int, default=5000, help="total self-play games")
     parser.add_argument("--workers", type=int, default=11, help="parallel processes")
     parser.add_argument("--out", default="data/nnue", help="output directory")
+    parser.add_argument("--time-ms", type=int, default=400, help="teacher budget per move")
+    parser.add_argument("--seed-base", type=int, default=0, help="shift all game seeds")
     args = parser.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
     per_worker = max(1, args.games // args.workers)
-    jobs = [(i, per_worker, args.out) for i in range(args.workers)]
+    jobs = [(i, per_worker, args.out, args.time_ms, args.seed_base) for i in range(args.workers)]
 
     print(f"generating ~{per_worker * args.workers} games on {args.workers} workers...")
     started = time.time()
