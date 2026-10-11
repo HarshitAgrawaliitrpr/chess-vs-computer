@@ -47,6 +47,7 @@ function Shell() {
             <span className="app__user-name" title={user.email || user.name}>
               {user.name}
             </span>
+            <span className="app__user-email">{user.email || "guest account (no email)"}</span>
             <span className={`app__user-badge app__user-badge--${user.provider}`}>{user.provider}</span>
             <button type="button" className="app__logout" onClick={logout}>
               Log out

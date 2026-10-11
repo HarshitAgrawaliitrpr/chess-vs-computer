@@ -329,8 +329,9 @@ body {
 
 .app__header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
-.app__user { display: flex; align-items: center; gap: 8px; }
+.app__user { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .app__user-name { font-weight: 600; }
+.app__user-email { font-size: 0.8rem; color: var(--muted); }
 .app__user-badge {
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
   padding: 2px 8px; border-radius: 999px; background: var(--panel-2);

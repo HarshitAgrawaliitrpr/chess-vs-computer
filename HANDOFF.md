@@ -71,6 +71,8 @@ Vercel.
 - Turso DB: `turso-db-create-chess-vs-computer-harshit-iitrpr` (ap-south-1) —
   note the odd DB name (dashboard wizard swallowed the CLI phrase); harmless.
 - `backend/scripts/turso_smoke.py` — full live-DB check (uses env vars, deletes its rows)
+- `backend/scripts/view_db.py` — read-only DB viewer (users + emails, games,
+  online matches); Vercel masks secrets, so the owner inspects data locally
 - `backend/scripts/selfplay.py` — engine strength monotonicity guard
 
 ## Gotchas discovered the hard way (don't re-learn these)

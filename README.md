@@ -165,6 +165,17 @@ $env:DATABASE_URL = "libsql://....turso.io"; $env:DATABASE_AUTH_TOKEN = "..."
 python scripts/turso_smoke.py
 ```
 
+To **see the actual data** (registered users with their emails, game history,
+online matches) run the read-only viewer — Vercel masks secret env values by
+design, so the owner views the database locally instead of through the
+dashboard (emails are stored in plain text; only passwords are bcrypt-hashed):
+
+```bash
+cd backend
+$env:DATABASE_URL = "https://....turso.io"; $env:DATABASE_AUTH_TOKEN = "..."
+python scripts/view_db.py        # no env vars = local ./chess.db
+```
+
 ### 2. Set the Vercel environment variables
 
 Dashboard → your project → **Settings → Environment Variables**, add the four
