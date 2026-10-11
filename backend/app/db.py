@@ -30,7 +30,9 @@ class DatabaseError(Exception):
 
 
 def database_url() -> str:
-    url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    # .strip(): copy-paste from the Turso dashboard often drags a trailing
+    # newline into the value.
+    url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL).strip()
     # `libsql://` selects the WebSocket transport in libsql_client, which newer
     # Turso databases reject (HRANA over HTTP only). The https endpoint speaks
     # the same protocol everywhere, so normalise - both URL forms then work.
@@ -40,7 +42,7 @@ def database_url() -> str:
 
 
 def database_auth_token() -> Optional[str]:
-    return os.getenv("DATABASE_AUTH_TOKEN") or None
+    return os.getenv("DATABASE_AUTH_TOKEN", "").strip() or None
 
 
 def _open() -> libsql_client.ClientSync:

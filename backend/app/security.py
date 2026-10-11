@@ -43,7 +43,7 @@ def is_valid_email(email: str) -> bool:
 
 
 def _resolve_secret() -> str:
-    env = os.getenv("SECRET_KEY")
+    env = os.getenv("SECRET_KEY", "").strip()
     if env:
         return env
     path = Path(__file__).resolve().parents[2] / ".jwt-secret"
