@@ -126,6 +126,13 @@ Vercel.
     Also: worker shard files flush in ~8KB blocks — mid-run byte deltas over
     a 60s window are the honest progress metric (line counts on a file being
     written can read as 0).
+14. **"White screen" reports: verify with the render probe before debugging
+    code.** `frontend/render-probe.mjs` runs the built bundle in jsdom
+    against the real API (both auth states) and prints any render crash;
+    the 2026-10-11 report was a stale browser cache — the deployed bundle
+    rendered clean. Probe needs an IIFE build with `--jsx=automatic
+    "--define:import.meta.env={}" --loader:.css=empty` (jsdom ignores
+    `<script type=module>`, and raw esbuild defaults break Vite idioms).
 
 ## Dev commands
 
