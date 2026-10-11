@@ -22,3 +22,6 @@ venv/
 # Harness / local artifacts
 .playwright-mcp/
 .vercel
+
+# Generated report (rebuild with docs/generate_report.py)
+/PROJECT_OVERVIEW.pdf
