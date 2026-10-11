@@ -30,7 +30,13 @@ class DatabaseError(Exception):
 
 
 def database_url() -> str:
-    return os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    # `libsql://` selects the WebSocket transport in libsql_client, which newer
+    # Turso databases reject (HRANA over HTTP only). The https endpoint speaks
+    # the same protocol everywhere, so normalise - both URL forms then work.
+    if url.startswith("libsql://"):
+        url = "https://" + url[len("libsql://") :]
+    return url
 
 
 def database_auth_token() -> Optional[str]:

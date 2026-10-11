@@ -77,7 +77,7 @@ saved automatically to a **Turso** (libSQL/SQLite) database, with a
 
 | Env var | Purpose | Required |
 |---|---|---|
-| `DATABASE_URL` | `libsql://<db>-<org>.turso.io` (prod) or `file:./chess.db` (local) | prod only |
+| `DATABASE_URL` | `libsql://<db>-<org>.turso.io` (prod) or `file:./chess.db` (local) — the `libsql://` form is auto-normalised to HRANA-over-HTTP, so both URL styles work | prod only |
 | `DATABASE_AUTH_TOKEN` | Turso API token | prod only |
 | `SECRET_KEY` | JWT signing secret (≥ 32 random chars) | prod (local generates `.jwt-secret`) |
 | `GOOGLE_CLIENT_ID` | enables the Google button | optional |
@@ -93,6 +93,15 @@ saved automatically to a **Turso** (libSQL/SQLite) database, with a
 turso db create chess-vs-computer
 turso db show chess-vs-computer                 # -> URL for DATABASE_URL
 turso db tokens create chess-vs-computer        # -> token for DATABASE_AUTH_TOKEN
+```
+
+`backend/scripts/turso_smoke.py` verifies the whole auth + games flow against
+the live database and removes every row it created:
+
+```bash
+cd backend
+$env:DATABASE_URL = "libsql://....turso.io"; $env:DATABASE_AUTH_TOKEN = "..."
+python scripts/turso_smoke.py
 ```
 
 ### 2. Set the Vercel environment variables
