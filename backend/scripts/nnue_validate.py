@@ -64,8 +64,9 @@ def run_tactics(net) -> int:
     return passed
 
 
-def play_game(net_a, seed: int) -> tuple[str, int]:
-    """net_a plays white when even seed, black when odd."""
+def play_game(args: tuple) -> tuple[str, float, int]:
+    """net plays white when the seed is even, black when odd."""
+    net_a, seed = args
     nnue.set_active(None)
     board = chess.Board()
     import random
@@ -84,19 +85,20 @@ def play_game(net_a, seed: int) -> tuple[str, int]:
             break
         board.push(move)
     if not board.is_game_over():
-        return "unfinished", 0.0
+        return "unfinished", 0.0, len(board.move_stack)
     outcome = board.outcome(claim_draw=True)
     if outcome is None or outcome.winner is None:
-        return "draw", 0.5
+        return "draw", 0.5, len(board.move_stack)
     net_is_white = seed % 2 == 0
     won = (outcome.winner == chess.WHITE) == net_is_white
-    return ("win" if won else "loss"), 1.0 if won else 0.0
+    return ("win" if won else "loss"), (1.0 if won else 0.0), len(board.move_stack)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--weights", default="app/engine/weights/nnue-32-v1.json")
     parser.add_argument("--games", type=int, default=20)
+    parser.add_argument("--workers", type=int, default=6, help="parallel ladder games")
     args = parser.parse_args()
 
     net = nnue.Nnue.load(args.weights)
@@ -106,17 +108,30 @@ def main() -> None:
     score = run_tactics(net)
     print(f"tactics: {score}/{len(TACTICS)}\n")
 
-    print(f"== head-to-head (net vs hand, {args.games} games, alternating colors) ==")
+    print(f"== head-to-head (net vs hand, {args.games} games, alternating colors, "
+          f"{args.workers} workers) ==")
+    import multiprocessing
+
     points = 0.0
     played = 0
-    for seed in range(args.games):
-        result, p = play_game(net, seed)
-        points += p
-        if result != "unfinished":
-            played += 1
-        print(f"  game {seed:2d}: {result}  ({points}/{played or '-'})", flush=True)
+    total_plies = 0
+    jobs = [(net, seed) for seed in range(args.games)]
+    with multiprocessing.Pool(args.workers) as pool:
+        for seed, (result, p, plies) in enumerate(
+            pool.imap_unordered(play_game, jobs)
+        ):
+            points += p
+            total_plies += plies
+            if result != "unfinished":
+                played += 1
+            print(
+                f"  finished game #{seed:2d}: {result:10s} ({plies:3d} plies)  "
+                f"running {points}/{played or '-'}",
+                flush=True,
+            )
     if played:
-        print(f"score: {points}/{played} = {100 * points / played:.0f}%")
+        print(f"score: {points}/{played} = {100 * points / played:.0f}%  "
+              f"(avg {total_plies / max(1, played):.0f} plies/game)")
 
     print("\n== speed (fixed budget, same position) ==")
     board = chess.Board("r1bq1rk1/pp2ppbp/2np1np1/2p5/2P1P3/2NP1NP1/PP2QPBP/R1B1K2R w KQ - 2 9")
