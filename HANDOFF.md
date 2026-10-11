@@ -31,7 +31,7 @@ Vercel.
       (paused when tab hidden), auto-queen, resign/cancel, refresh-resume via
       localStorage; results written for BOTH players into history + leaderboard
       (`difficulty='online'`); prod E2E verified live
-- [x] Tests: 52 backend (pytest) + 53 frontend (vitest) — all green
+- [x] Tests: 55 backend (pytest) + 53 frontend (vitest) - all green
 - [x] **NNUE evaluator v1** (2026-10-11): 768→32→1 numpy net distilled from
       1,496 self-play games (177,893 unique positions, depth-3+qsearch labels);
       validation: tactics 6/6, ladder 9W-5L=64% vs hand eval at equal depth,
@@ -73,6 +73,8 @@ Vercel.
 - `backend/scripts/turso_smoke.py` — full live-DB check (uses env vars, deletes its rows)
 - `backend/scripts/view_db.py` — read-only DB viewer (users + emails, games,
   online matches); Vercel masks secrets, so the owner inspects data locally
+- `backend/app/routes_admin.py` — one-shot owner window (`/api/admin/users`,
+  armed by the `ADMIN_TOKEN` env var; see gotcha #15)
 - `backend/scripts/selfplay.py` — engine strength monotonicity guard
 
 ## Gotchas discovered the hard way (don't re-learn these)
@@ -133,11 +135,20 @@ Vercel.
     rendered clean. Probe needs an IIFE build with `--jsx=automatic
     "--define:import.meta.env={}" --loader:.css=empty` (jsdom ignores
     `<script type=module>`, and raw esbuild defaults break Vite idioms).
+15. **Vercel "sensitive" env vars are write-only forever** — the value
+    cannot be read back by the owner, the API, or anyone; the only cure
+    is rotation at the source (Turso dashboard → Tokens). To give the
+    owner a data window anyway there is `GET /api/admin/users?token=…`
+    (`routes_admin.py`): 404 unless the `ADMIN_TOKEN` env var is set,
+    403 on mismatch (constant-time), emails only, never password hashes.
+    Lifecycle used 2026-10-11: arm env var → redeploy (env needs a
+    redeploy!) → one call → delete env var → redeploy → verified 404.
+    The same one-shot pattern works for any future owner-only debugging.
 
 ## Dev commands
 
 ```bash
-cd backend  && python -m pytest          # 52 tests
+cd backend  && python -m pytest          # 55 tests
 cd frontend && npx vitest run            # 53 tests
 cd frontend && npx eslint src            # lint
 cd frontend && npm run build             # production bundle
