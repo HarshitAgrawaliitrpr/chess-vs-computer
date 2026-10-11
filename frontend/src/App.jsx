@@ -1,6 +1,7 @@
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import ChessGame from "./components/ChessGame.jsx";
 import GameHistory from "./components/GameHistory.jsx";
+import Leaderboard from "./components/Leaderboard.jsx";
 import LoginScreen from "./components/LoginScreen.jsx";
 
 function Shell() {
@@ -37,6 +38,7 @@ function Shell() {
       </header>
       <ChessGame />
       <GameHistory />
+      <Leaderboard />
       <footer className="app__footer">
         <span className="app__credit">CREATED BY HARSHIT AGRAWAL WITH MIMO</span>
         <span>

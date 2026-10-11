@@ -135,3 +135,18 @@ class GameOut(BaseModel):
     difficulty: str
     moves_count: int
     created_at: str
+
+
+class LeaderboardEntry(BaseModel):
+    """Aggregated player ranking (points = wins + 0.5 * draws)."""
+
+    rank: int
+    user_id: str
+    name: str
+    provider: AuthProvider
+    games: int
+    wins: int
+    draws: int
+    losses: int
+    points: float
+    win_rate: float = Field(..., description="Win percentage, 0-100.")

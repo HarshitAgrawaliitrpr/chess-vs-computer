@@ -401,3 +401,39 @@ body {
 .history__badge--draw { color: var(--info); }
 .history__meta { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history__date { color: var(--muted); font-size: 0.8rem; }
+
+/* Leaderboard */
+.leaderboard { margin-top: 22px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.leaderboard__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.leaderboard__head h2 { margin: 0; font-size: 1.1rem; }
+.leaderboard__filter { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.8rem; }
+.leaderboard__filter select {
+  padding: 5px 8px; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem;
+}
+.leaderboard__empty { color: var(--muted); font-size: 0.9rem; margin: 6px 0; }
+.leaderboard__error { color: var(--danger); font-size: 0.85rem; margin: 6px 0; }
+.leaderboard__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.leaderboard__row {
+  display: grid; grid-template-columns: 40px 1fr auto auto auto; gap: 12px; align-items: center;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; font-size: 0.88rem;
+}
+.leaderboard__row:first-child { border-color: var(--accent); }
+.leaderboard__rank { font-weight: 700; text-align: center; }
+.leaderboard__name { font-weight: 600; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard__badge {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px;
+  padding: 1px 7px; border-radius: 999px; background: var(--panel);
+  border: 1px solid var(--border); color: var(--muted); font-weight: 400;
+}
+.leaderboard__badge--email { color: var(--accent); }
+.leaderboard__badge--google { color: var(--info); }
+.leaderboard__record { color: var(--muted); font-variant-numeric: tabular-nums; }
+.leaderboard__games { color: var(--muted); font-size: 0.8rem; }
+.leaderboard__points { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .leaderboard__row { grid-template-columns: 32px 1fr auto; }
+  .leaderboard__games, .leaderboard__record { display: none; }
+}

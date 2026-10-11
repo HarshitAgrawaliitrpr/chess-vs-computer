@@ -217,3 +217,54 @@ def list_games(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         (user_id, limit),
     )
     return [_game_from_row(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Leaderboard
+# ---------------------------------------------------------------------------
+
+
+def leaderboard(difficulty: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+    """Top players ranked by classic chess points (win=1, draw=0.5, loss=0).
+
+    One aggregate query over the games table; ties break on wins, then games
+    played, then name. An optional difficulty filter restricts the ranking to
+    games played at that level.
+    """
+    ensure_ready()
+    where = "WHERE g.difficulty = ?" if difficulty else ""
+    params: List[Any] = [difficulty] if difficulty else []
+    params.append(limit)
+    rows = db.query(
+        "SELECT u.id, u.name, u.provider, COUNT(*) AS games, "
+        "SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) AS wins, "
+        "SUM(CASE WHEN g.result = 'draw' THEN 1 ELSE 0 END) AS draws, "
+        "SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) AS losses "
+        f"FROM games g JOIN users u ON u.id = g.user_id {where} "
+        "GROUP BY u.id, u.name, u.provider "
+        "ORDER BY SUM(CASE WHEN g.result = 'win' THEN 1.0 "
+        "WHEN g.result = 'draw' THEN 0.5 ELSE 0.0 END) DESC, "
+        "wins DESC, games DESC, u.name ASC "
+        "LIMIT ?",
+        tuple(params),
+    )
+    entries: List[Dict[str, Any]] = []
+    for row in rows:
+        games = int(row[3] or 0)
+        wins = int(row[4] or 0)
+        draws = int(row[5] or 0)
+        losses = int(row[6] or 0)
+        entries.append(
+            {
+                "user_id": row[0],
+                "name": row[1],
+                "provider": row[2],
+                "games": games,
+                "wins": wins,
+                "draws": draws,
+                "losses": losses,
+                "points": wins + 0.5 * draws,
+                "win_rate": round(100.0 * wins / games, 1) if games else 0.0,
+            }
+        )
+    return entries

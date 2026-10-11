@@ -66,6 +66,7 @@ POST /api/auth/guest     -> {name?}                          -> {token, user} (2
 GET  /api/auth/me        -> current user (Bearer token)
 POST /api/games          -> {pgn, result, player_color, ...} -> saved game (201)
 GET  /api/games          -> the signed-in user's last 20 games
+GET  /api/leaderboard    -> top players by points (win=1, draw=0.5); ?difficulty=&limit=
 ```
 
 ## Accounts & game history (Turso)

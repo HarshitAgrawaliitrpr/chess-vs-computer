@@ -22,15 +22,19 @@ custom minimax/alpha-beta engine, accounts + game history on **Turso**
 - [x] Auth: email/password (bcrypt), guest (UUID), Google (GIS ID token — code ready, disabled until GOOGLE_CLIENT_ID)
 - [x] JWT sessions (HS256, 30 days), `users` + `games` tables on Turso
 - [x] Auto-save finished games + "My games" panel
-- [x] Tests: 30 backend (pytest) + 35 frontend (vitest) — all green
+- [x] Leaderboard: top players by points (win=1, draw=0.5), difficulty filter,
+      top-3 medals; public endpoint `GET /api/leaderboard`, refreshes on
+      `game-saved` like the history panel
+- [x] Tests: 34 backend (pytest) + 39 frontend (vitest) — all green
 - [ ] Optional: Google button (needs GOOGLE_CLIENT_ID env var in Vercel; see README)
 - [x] Security: all temporary tokens (Vercel, Turso CLI-less flow) revoked/verified dead
 
 ## Where things live
 
 - Backend app: `backend/app/` — `main.py` (engine routes + router wiring +
-  static mount), `db.py` (libsql-client layer), `store.py` (schema + repo),
-  `security.py` (bcrypt/JWT/Google), `routes_auth.py`, `routes_games.py`
+  static mount), `db.py` (libsql-client layer), `store.py` (schema + repo +
+  leaderboard aggregate), `security.py` (bcrypt/JWT/Google), `routes_auth.py`,
+  `routes_games.py`, `routes_leaderboard.py`
 - Frontend: `frontend/src/` — `auth/AuthContext.jsx`, `api/authClient.js`,
   `components/LoginScreen.jsx`, `components/GameHistory.jsx`,
   `hooks/useChessGame.js` (all game + pre-move logic)
@@ -77,5 +81,6 @@ cd backend  && uvicorn app.main:app --reload --port 8000
 
 ## Ideas queued (user hasn't picked yet)
 
-Leaderboard/ratings (Elo from games table), sound effects, mobile polish,
-Google login completion, move annotations for the engine (why did it play that).
+Leaderboard/ratings — DONE (2026-10-11, see above); remaining ideas: sound
+effects, mobile polish, Google login completion, move annotations for the
+engine (why did it play that).

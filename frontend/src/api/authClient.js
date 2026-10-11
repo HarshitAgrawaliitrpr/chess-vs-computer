@@ -83,4 +83,10 @@ export const authApi = {
   me: () => request("/api/auth/me"),
   saveGame: (payload) => request("/api/games", { method: "POST", body: payload }),
   listGames: () => request("/api/games"),
+  leaderboard: (difficulty) =>
+    request(
+      difficulty
+        ? `/api/leaderboard?difficulty=${encodeURIComponent(difficulty)}`
+        : "/api/leaderboard",
+    ),
 };
